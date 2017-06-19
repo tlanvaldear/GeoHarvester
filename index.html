@@ -1,0 +1,102 @@
+<div class="sigma" id="sigma-container-2015"></div>
+<div class="sigma" id="sigma-container-2017"></div>
+<script src="js/sigma.js"></script>
+<script src="plugins/sigma.parsers.json.min.js"></script>
+<script src="plugins/sigma.neo4j.cypher.min.js"></script>
+<script src="plugins/sigma.layout.forceAtlas2.min.js"></script>
+<style type="text/css">
+ 
+        /* Set a height on the div or it will have zero height */
+        .sigma {
+            height: 100%;
+        }
+ 
+    </style>
+<script>
+  // Add a method to the graph model that returns an
+  // object with every neighbors of a node inside:
+  sigma.classes.graph.addMethod('neighbors', function(nodeId) {
+    var k,
+        neighbors = {},
+        index = this.allNeighborsIndex[nodeId] || {};
+
+    for (k in index)
+      neighbors[k] = this.nodesIndex[k];
+
+    return neighbors;
+  });
+
+  sigma.neo4j.cypher(
+  { url: 'http://localhost:7474', user: 'neo4j', password: 'EDIT_PASS' },
+  'MATCH (n:Node2015) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m LIMIT 135',
+  { container: 'sigma-container-2015'},
+    function(s) {
+    s.settings('defaultEdgeType', 'arrow');
+    s.settings('minArrowSize', 100)
+      // We first need to save the original colors of our
+      // nodes and edges, like this:
+      s.graph.nodes().forEach(function(n) {
+        n.originalColor = n.color;
+        n.label = n.neo4j_data['name'];
+        s.refresh();
+      });
+      s.graph.edges().forEach(function(e) {
+        e.originalColor = e.color;
+      });
+      s.startForceAtlas2();
+      s.bind('overNode',function(e) {
+      	s.stopForceAtlas2();
+      });
+      s.bind('clickNode', function(e) {
+        var nodeId = e.data.node.id,
+            toKeep = s.graph.neighbors(nodeId);
+        toKeep[nodeId] = e.data.node;
+
+        s.graph.nodes().forEach(function(n) {
+          if (toKeep[n.id])
+            n.color = n.originalColor;
+          else
+            n.color = '#eee';
+        });
+
+        s.graph.edges().forEach(function(e) {
+          if (toKeep[e.source] && toKeep[e.target])
+            e.color = e.originalColor;
+          else
+            e.color = '#eee';
+        });
+
+        // Since the data has been modified, we need to
+        // call the refresh method to make the colors
+        // update effective.
+        
+        s.refresh();
+      });
+      s.bind('clickStage', function(e) {
+        s.graph.nodes().forEach(function(n) {
+          n.color = n.originalColor;
+        });
+
+        s.graph.edges().forEach(function(e) {
+          e.color = e.originalColor;
+        });
+
+      s.refresh();
+      });
+    }
+  );
+  // Calling neo4j to get all its relationship type
+sigma.neo4j.getTypes(
+        { url: 'http://localhost:7474', user:'neo4j', password:'EDIT_PASS' },
+        function(rel) {
+            console.log("Relationship types " + rel);
+        }
+);
+// Calling neo4j to get all its node label
+sigma.neo4j.getLabels(
+        { url: 'http://localhost:7474', user:'neo4j', password:'EDIT_PASS' },
+        function(labels) {
+            console.log("Node labels " + labels);
+        }
+);
+</script>
