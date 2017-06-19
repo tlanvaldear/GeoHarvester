@@ -1,3 +1,8 @@
+<html>
+<head>
+<meta charset='utf-8'/>
+</head>
+<body>
 <div class="sigma" id="sigma-container-2015"></div>
 <div class="sigma" id="sigma-container-2017"></div>
 <script src="js/sigma.js"></script>
@@ -18,7 +23,7 @@
   sigma.classes.graph.addMethod('neighbors', function(nodeId) {
     var k,
         neighbors = {},
-        index = this.allNeighborsIndex[nodeId] || {};
+        index = this.outNeighborsIndex[nodeId] || {};
 
     for (k in index)
       neighbors[k] = this.nodesIndex[k];
@@ -45,7 +50,7 @@
       });
       s.startForceAtlas2();
       s.bind('overNode',function(e) {
-      	s.stopForceAtlas2();
+        s.stopForceAtlas2();
       });
       s.bind('clickNode', function(e) {
         var nodeId = e.data.node.id,
@@ -94,9 +99,11 @@ sigma.neo4j.getTypes(
 );
 // Calling neo4j to get all its node label
 sigma.neo4j.getLabels(
-        { url: 'http://localhost:7474', user:'neo4j', password:'EDIT_PASS' },
+        { url: 'http://localhost:7474', user:'neo4j', password:'87cEbq9d' },
         function(labels) {
             console.log("Node labels " + labels);
         }
 );
 </script>
+</body>
+</html>
