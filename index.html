@@ -9,6 +9,8 @@
 <script src="plugins/sigma.parsers.json.min.js"></script>
 <script src="plugins/sigma.neo4j.cypher.min.js"></script>
 <script src="plugins/sigma.layout.forceAtlas2.min.js"></script>
+<script src="plugins/sigma.layout.noverlap.min.js"></script>
+<script src="plugins/sigma.plugins.animate.min.js"></script>
 <style type="text/css">
  
         /* Set a height on the div or it will have zero height */
@@ -18,8 +20,10 @@
  
     </style>
 <script>
+  var xKeep = {};
+  var yKeep = {};
   // Add a method to the graph model that returns an
-  // object with every neighbors of a node inside:
+  // object with out neighbors of a node inside:
   sigma.classes.graph.addMethod('neighbors', function(nodeId) {
     var k,
         neighbors = {},
@@ -30,14 +34,19 @@
 
     return neighbors;
   });
-
+  //TODO: Automatize this with GetLabels and query every single graph within a new container each time
   sigma.neo4j.cypher(
-  { url: 'http://localhost:7474', user: 'neo4j', password: 'EDIT_PASS' },
+  { url: 'http://0.0.0.0:7474', user: 'neo4j', password: '87cEbq9d' },
   'MATCH (n:Node2015) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m LIMIT 135',
   { container: 'sigma-container-2015'},
     function(s) {
+    //Params for Directed graph with visible edges
     s.settings('defaultEdgeType', 'arrow');
-    s.settings('minArrowSize', 100)
+    s.settings('minArrowSize', 100);
+    //Camera for 
+    s.addCamera('cam0');
+    var listener = s.configNoverlap({nodeMargin: 0.1, scaleNodes: 1.05, gridSize: 75, duration: 100});
+    s.startNoverlap();
       // We first need to save the original colors of our
       // nodes and edges, like this:
       s.graph.nodes().forEach(function(n) {
@@ -48,20 +57,35 @@
       s.graph.edges().forEach(function(e) {
         e.originalColor = e.color;
       });
-      s.startForceAtlas2();
+      s.startForceAtlas2({worker: true, barnesHutOptimize: false});
       s.bind('overNode',function(e) {
+        //if a node is hovered, stop Forces from calculating
         s.stopForceAtlas2();
       });
       s.bind('clickNode', function(e) {
         var nodeId = e.data.node.id,
             toKeep = s.graph.neighbors(nodeId);
         toKeep[nodeId] = e.data.node;
-
+        var focus;
+        // xKeep[nodeId] = s.graph.nodes(nodeId).x;
+        // yKeep[nodeId] = s.graph.nodes(nodeId).y;
+        // s.graph.nodes(nodeId).x = 0;
+        // s.graph.nodes(nodeId).y = 0;
         s.graph.nodes().forEach(function(n) {
           if (toKeep[n.id])
             n.color = n.originalColor;
           else
             n.color = '#eee';
+          if (n.id == nodeId){
+            focus = n;
+            s.cameras[0].goTo({x:focus['read_cam0:x'],y:focus['read_cam0:y'],ratio:0.1});
+
+          }
+          // if (xKeep[n.id] && n.id != nodeId){
+          //   s.graph.nodes(n.id).x = xKeep[n.id];
+          //   s.graph.nodes(n.id).y = yKeep[n.id];
+            
+          // }
         });
 
         s.graph.edges().forEach(function(e) {
@@ -70,16 +94,19 @@
           else
             e.color = '#eee';
         });
-
+        
         // Since the data has been modified, we need to
         // call the refresh method to make the colors
         // update effective.
-        
         s.refresh();
       });
       s.bind('clickStage', function(e) {
         s.graph.nodes().forEach(function(n) {
           n.color = n.originalColor;
+          // if (xKeep[n.id]){
+          //   s.graph.nodes(n.id).x = xKeep[n.id];
+          //   s.graph.nodes(n.id).y = yKeep[n.id];
+          // }
         });
 
         s.graph.edges().forEach(function(e) {
@@ -92,14 +119,14 @@
   );
   // Calling neo4j to get all its relationship type
 sigma.neo4j.getTypes(
-        { url: 'http://localhost:7474', user:'neo4j', password:'EDIT_PASS' },
+        { url: 'http://0.0.0.0:7474', user:'neo4j', password:'87cEbq9d' },
         function(rel) {
             console.log("Relationship types " + rel);
         }
 );
 // Calling neo4j to get all its node label
 sigma.neo4j.getLabels(
-        { url: 'http://localhost:7474', user:'neo4j', password:'87cEbq9d' },
+        { url: 'http://0.0.0.0:7474', user:'neo4j', password:'87cEbq9d' },
         function(labels) {
             console.log("Node labels " + labels);
         }
