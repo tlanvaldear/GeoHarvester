@@ -3,8 +3,8 @@
 <meta charset='utf-8'/>
 </head>
 <body>
-<div class="sigma" id="sigma-container-2015"></div>
-<div class="sigma" id="sigma-container-2017"></div>
+<div class="sigma" id="sigma-container-2015">2015</div>
+<div class="sigma" id="sigma-container-2017">2017</div>
 <script src="js/sigma.js"></script>
 <script src="plugins/sigma.parsers.json.min.js"></script>
 <script src="plugins/sigma.neo4j.cypher.min.js"></script>
@@ -15,31 +15,17 @@
  
         /* Set a height on the div or it will have zero height */
         .sigma {
-            height: 100%;
+            width: 50%;
+            height: 50%;
+            border-style: solid;
+            margin-top:20px;
         }
  
     </style>
 <script>
   var xKeep = {};
   var yKeep = {};
-  // Add a method to the graph model that returns an
-  // object with out neighbors of a node inside:
-  sigma.classes.graph.addMethod('neighbors', function(nodeId) {
-    var k,
-        neighbors = {},
-        index = this.outNeighborsIndex[nodeId] || {};
-
-    for (k in index)
-      neighbors[k] = this.nodesIndex[k];
-
-    return neighbors;
-  });
-  //TODO: Automatize this with GetLabels and query every single graph within a new container each time
-  sigma.neo4j.cypher(
-  { url: 'http://0.0.0.0:7474', user: 'neo4j', password: '87cEbq9d' },
-  'MATCH (n:Node2015) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m LIMIT 135',
-  { container: 'sigma-container-2015'},
-    function(s) {
+  function graphstart(s) {
     //Params for Directed graph with visible edges
     s.settings('defaultEdgeType', 'arrow');
     s.settings('minArrowSize', 100);
@@ -47,6 +33,7 @@
     s.addCamera('cam0');
     var listener = s.configNoverlap({nodeMargin: 0.1, scaleNodes: 1.05, gridSize: 75, duration: 100});
     s.startNoverlap();
+    var focus;
       // We first need to save the original colors of our
       // nodes and edges, like this:
       s.graph.nodes().forEach(function(n) {
@@ -57,7 +44,7 @@
       s.graph.edges().forEach(function(e) {
         e.originalColor = e.color;
       });
-      s.startForceAtlas2({worker: true, barnesHutOptimize: false});
+      s.startForceAtlas2();
       s.bind('overNode',function(e) {
         //if a node is hovered, stop Forces from calculating
         s.stopForceAtlas2();
@@ -66,7 +53,7 @@
         var nodeId = e.data.node.id,
             toKeep = s.graph.neighbors(nodeId);
         toKeep[nodeId] = e.data.node;
-        var focus;
+        
         // xKeep[nodeId] = s.graph.nodes(nodeId).x;
         // yKeep[nodeId] = s.graph.nodes(nodeId).y;
         // s.graph.nodes(nodeId).x = 0;
@@ -74,11 +61,12 @@
         s.graph.nodes().forEach(function(n) {
           if (toKeep[n.id])
             n.color = n.originalColor;
-          else
+          else{
             n.color = '#eee';
+            }
           if (n.id == nodeId){
             focus = n;
-            s.cameras[0].goTo({x:focus['read_cam0:x'],y:focus['read_cam0:y'],ratio:0.1});
+            s.cameras[0].goTo({x:focus['read_cam0:x'],y:focus['read_cam0:y'],ratio:0.2});
 
           }
           // if (xKeep[n.id] && n.id != nodeId){
@@ -103,6 +91,10 @@
       s.bind('clickStage', function(e) {
         s.graph.nodes().forEach(function(n) {
           n.color = n.originalColor;
+          if (focus==n){
+            s.cameras[0].goTo({x:0,y:0,ratio:1});
+            focus = null;
+          }
           // if (xKeep[n.id]){
           //   s.graph.nodes(n.id).x = xKeep[n.id];
           //   s.graph.nodes(n.id).y = yKeep[n.id];
@@ -116,17 +108,45 @@
       s.refresh();
       });
     }
-  );
+  // Add a method to the graph model that returns an
+  // object with out neighbors of a node inside:
+  sigma.classes.graph.addMethod('neighbors', function(nodeId) {
+    var k,
+        neighbors = {},
+        index = this.outNeighborsIndex[nodeId] || {};
+
+    for (k in index)
+      neighbors[k] = this.nodesIndex[k];
+
+    return neighbors;
+  });
+
+  
+  //TODO: Automatize this with GetLabels and query every single graph within a new container each time
+  sigma.neo4j.cypher(
+  { url: 'http://0.0.0.0:7474', user: 'neo4j', password: 'EDIT_PASS' },
+  'MATCH (n:Node2015) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m LIMIT 135',
+  { container: 'sigma-container-2015'},
+    function(s){
+      graphstart(s);
+    });
+  sigma.neo4j.cypher(
+  { url: 'http://0.0.0.0:7474', user: 'neo4j', password: 'EDIT_PASS' },
+  'MATCH (n:Node2017) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m LIMIT 135',
+  { container: 'sigma-container-2017'},
+    function(s){
+      graphstart(s);
+    });
   // Calling neo4j to get all its relationship type
 sigma.neo4j.getTypes(
-        { url: 'http://0.0.0.0:7474', user:'neo4j', password:'87cEbq9d' },
+        { url: 'http://0.0.0.0:7474', user:'neo4j', password:'EDIT_PASS' },
         function(rel) {
             console.log("Relationship types " + rel);
         }
 );
 // Calling neo4j to get all its node label
 sigma.neo4j.getLabels(
-        { url: 'http://0.0.0.0:7474', user:'neo4j', password:'87cEbq9d' },
+        { url: 'http://0.0.0.0:7474', user:'neo4j', password:'EDIT_PASS' },
         function(labels) {
             console.log("Node labels " + labels);
         }
