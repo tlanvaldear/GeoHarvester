@@ -4,8 +4,10 @@ May 15 - July 28 / Geographic data visualization and analysis | GIS-to-GIS harve
 # Dependencies
 
 [Neo4j 3.0](https://neo4j.com/download/?ref=home) - Used as support for graph data
+
 [Sigma.js](https://github.com/jacomyal/sigma.js) - Graph drawing library
-CSV Files to import in Neo4j
+
+CSV Files to import into Neo4j
 
 # How to use
 
