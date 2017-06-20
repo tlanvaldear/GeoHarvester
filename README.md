@@ -15,6 +15,10 @@ CSV Files to import into Neo4j
 
 - Start your Neo4j server
 
+- Setup your password into `index.html`
+
+- Edit `neo4j/conf/neo4j.conf` file in order to open access to `0.0.0.0`
+
 - If not on a webserver, use `python -m SimpleHTTPServer` in the root directory of *GeoHarvester*
 
 - Connect to [0.0.0.0:8000](http://0.0.0.0:8000) 
