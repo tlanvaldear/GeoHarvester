@@ -3,8 +3,10 @@
 <meta charset='utf-8'/>
 </head>
 <body>
-<div class="sigma" id="sigma-container-2015">2015</div>
-<div class="sigma" id="sigma-container-2017">2017</div>
+<div class="sigma" id="sigma-container-2015"></div>
+2015
+<div class="sigma" id="sigma-container-2017"></div>
+2017
 <script src="js/sigma.js"></script>
 <script src="plugins/sigma.parsers.json.min.js"></script>
 <script src="plugins/sigma.neo4j.cypher.min.js"></script>
@@ -12,27 +14,32 @@
 <script src="plugins/sigma.layout.noverlap.min.js"></script>
 <script src="plugins/sigma.plugins.animate.min.js"></script>
 <style type="text/css">
- 
+
         /* Set a height on the div or it will have zero height */
         .sigma {
             width: 50%;
             height: 50%;
-            border-style: solid;
             margin-top:20px;
+
         }
- 
+        div {
+          display:block;
+          border-style: solid;
+        }
+
     </style>
 <script>
   var xKeep = {};
   var yKeep = {};
+  var cont = [];
+  var ids = {};
   function graphstart(s) {
     //Params for Directed graph with visible edges
     s.settings('defaultEdgeType', 'arrow');
     s.settings('minArrowSize', 100);
-    //Camera for 
+    //Camera for recentering on node after click
     s.addCamera('cam0');
-    var listener = s.configNoverlap({nodeMargin: 0.1, scaleNodes: 1.05, gridSize: 75, duration: 100});
-    s.startNoverlap();
+    var listener = s.configNoverlap({nodeMargin: 1, scaleNodes: 1.05, gridSize: 75, duration: 1});
     var focus;
       // We first need to save the original colors of our
       // nodes and edges, like this:
@@ -44,7 +51,22 @@
       s.graph.edges().forEach(function(e) {
         e.originalColor = e.color;
       });
-      s.startForceAtlas2();
+      s.startForceAtlas2({
+            linLogMode: true,
+            outboundAttractionDistribution: !1,
+            adjustSizes: false,
+            edgeWeightInfluence: 0,
+            scalingRatio: 0.5,
+            strongGravityMode: !1,
+            gravity: 1,
+            barnesHutOptimize: false,
+            barnesHutTheta: 0.5,
+            slowDown: 1,
+            startingIterations: 1,
+            iterationsPerRender: 1,
+            worker: true
+        });
+      s.startNoverlap();
       s.bind('overNode',function(e) {
         //if a node is hovered, stop Forces from calculating
         s.stopForceAtlas2();
@@ -53,12 +75,9 @@
         var nodeId = e.data.node.id,
             toKeep = s.graph.neighbors(nodeId);
         toKeep[nodeId] = e.data.node;
-        
-        // xKeep[nodeId] = s.graph.nodes(nodeId).x;
-        // yKeep[nodeId] = s.graph.nodes(nodeId).y;
-        // s.graph.nodes(nodeId).x = 0;
-        // s.graph.nodes(nodeId).y = 0;
+
         s.graph.nodes().forEach(function(n) {
+          ids[n.id] = n;
           if (toKeep[n.id])
             n.color = n.originalColor;
           else{
@@ -66,14 +85,23 @@
             }
           if (n.id == nodeId){
             focus = n;
-            s.cameras[0].goTo({x:focus['read_cam0:x'],y:focus['read_cam0:y'],ratio:0.2});
+            s.cameras[0].goTo({x:focus['read_cam0:x'],y:focus['read_cam0:y'],ratio:0.55});
+            cont.forEach(function(si){
+              if (si != s){
+                si.graph.nodes().forEach(function(nn){
+                    if (nn.label == n.label && !ids[nn.id]){
+                      ids[nn.id] = nn;
+                      var ev = e;
+                      ev.data.node = nn;
+                      si.dispatchEvent('clickNode',ev.data);
+                      // si.cameras[0].goTo({x:nn['read_cam0:x'],y:nn['read_cam0:y'],ratio:0.55});
+                    }
+                });
+
+              }
+            });
 
           }
-          // if (xKeep[n.id] && n.id != nodeId){
-          //   s.graph.nodes(n.id).x = xKeep[n.id];
-          //   s.graph.nodes(n.id).y = yKeep[n.id];
-            
-          // }
         });
 
         s.graph.edges().forEach(function(e) {
@@ -82,28 +110,27 @@
           else
             e.color = '#eee';
         });
-        
+
         // Since the data has been modified, we need to
         // call the refresh method to make the colors
         // update effective.
         s.refresh();
+        ids = [];
       });
       s.bind('clickStage', function(e) {
-        s.graph.nodes().forEach(function(n) {
-          n.color = n.originalColor;
-          if (focus==n){
-            s.cameras[0].goTo({x:0,y:0,ratio:1});
-            focus = null;
-          }
-          // if (xKeep[n.id]){
-          //   s.graph.nodes(n.id).x = xKeep[n.id];
-          //   s.graph.nodes(n.id).y = yKeep[n.id];
-          // }
-        });
+        cont.forEach(function(si){
+            si.graph.nodes().forEach(function(n) {
+              n.color = n.originalColor;
+              if (focus != null){
+                      si.cameras[0].goTo({x:0,y:0,ratio:1});
+                  }
 
-        s.graph.edges().forEach(function(e) {
-          e.color = e.originalColor;
-        });
+              });
+              si.graph.edges().forEach(function(e) {
+                e.color = e.originalColor;
+              });
+        focus = null;
+    });
 
       s.refresh();
       });
@@ -121,32 +148,34 @@
     return neighbors;
   });
 
-  
+
   //TODO: Automatize this with GetLabels and query every single graph within a new container each time
   sigma.neo4j.cypher(
-  { url: 'http://0.0.0.0:7474', user: 'neo4j', password: 'EDIT_PASS' },
-  'MATCH (n:Node2015) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m LIMIT 135',
+  { url: 'http://0.0.0.0:7474', user: 'neo4j', password: '87cEbq9d' },
+  'MATCH (n:Node2015) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m',
   { container: 'sigma-container-2015'},
     function(s){
+      cont[0] = s;
       graphstart(s);
     });
   sigma.neo4j.cypher(
-  { url: 'http://0.0.0.0:7474', user: 'neo4j', password: 'EDIT_PASS' },
-  'MATCH (n:Node2017) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m LIMIT 135',
+  { url: 'http://0.0.0.0:7474', user: 'neo4j', password: '87cEbq9d' },
+  'MATCH (n:Node2017) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m',
   { container: 'sigma-container-2017'},
     function(s){
+      cont[1] = s;
       graphstart(s);
     });
   // Calling neo4j to get all its relationship type
 sigma.neo4j.getTypes(
-        { url: 'http://0.0.0.0:7474', user:'neo4j', password:'EDIT_PASS' },
+        { url: 'http://0.0.0.0:7474', user:'neo4j', password:'87cEbq9d' },
         function(rel) {
             console.log("Relationship types " + rel);
         }
 );
 // Calling neo4j to get all its node label
 sigma.neo4j.getLabels(
-        { url: 'http://0.0.0.0:7474', user:'neo4j', password:'EDIT_PASS' },
+        { url: 'http://0.0.0.0:7474', user:'neo4j', password:'87cEbq9d' },
         function(labels) {
             console.log("Node labels " + labels);
         }
