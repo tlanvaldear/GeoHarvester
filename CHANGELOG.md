@@ -30,4 +30,6 @@
 >
 > Border fix by putting coresponding _year_ under its *div*
 >
->
+> Dropdown menu to open 2015/2017 or 2015+2017 view
+>> **WIP** Will create GIS Hierarchy via SVG using Tulip.
+>> **KNOWN ISSUE** opening multiple times the same graph won't erase its previous instance

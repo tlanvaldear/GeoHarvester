@@ -1,38 +1,91 @@
 <html>
 <head>
 <meta charset='utf-8'/>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 </head>
 <body>
+<div class="dropdown">
+    <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">Choix
+    <span class="caret"></span></button>
+    <ul class="dropdown-menu">
+      <li onclick="query('2015')">2015</li>
+      <li onclick="query('2017')">2017</li>
+      <li onclick="query('oall')">Fusion 2015-2017</li>
+      <li>Hiérarchie des SIG</li>
+    </ul>
+</div>
 <div class="sigma" id="sigma-container-2015"></div>
-2015
 <div class="sigma" id="sigma-container-2017"></div>
-2017
+<div class="sigma" id="sigma-container-oall"></div>
+<div class="sigma" id="sigma-container-emmm"></div>
 <script src="js/sigma.js"></script>
 <script src="plugins/sigma.parsers.json.min.js"></script>
 <script src="plugins/sigma.neo4j.cypher.min.js"></script>
 <script src="plugins/sigma.layout.forceAtlas2.min.js"></script>
 <script src="plugins/sigma.layout.noverlap.min.js"></script>
 <script src="plugins/sigma.plugins.animate.min.js"></script>
+
 <style type="text/css">
 
-        /* Set a height on the div or it will have zero height */
+        /* Set height on the div or it will have zero height */
         .sigma {
-            width: 50%;
+            width: 49%;
             height: 50%;
+        }
+        #sigma-container-2015 {
+            /*display:block;*/
+            float:left;
+            border-style: solid;
+            display: none;
+        }
+        #sigma-container-2017 {
+            /*display:block;*/
+            float:right;
+            border-style: solid;
+            /*overflow:hidden;*/
+            display: none;
+        }
+        #sigma-container-oall {
+            float:left;
+            border-style:solid;
             margin-top:20px;
-
+            display: none;
         }
-        div {
-          display:block;
-          border-style: solid;
+        #sigma-container-emmm {
+            /*display:block;*/
+            float:right;
+            border-style: solid;
+            /*overflow:hidden;*/
+            display: none;
         }
-
     </style>
 <script>
+  var queries = {
+      "2015": "MATCH (n:Node2017) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
+      "2017": "MATCH (n:Node2015) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
+      "oall": "MATCH (n:Nodeoall) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
+      "eaniemeanieminymoe" : "MATCH (n)-[r]->(m) RETURN r,n,m",
+  };
+  var pwd = '87cEbq9d';
+  var login = 'neo4j';
+  var connect = 'http://0.0.0.0:7474';
   var xKeep = {};
   var yKeep = {};
   var cont = [];
   var ids = {};
+  function query(label){
+      sigma.neo4j.cypher(
+      { url: connect, user: login, password: pwd },
+      queries[label],
+      { container: 'sigma-container-'+label},
+        function(s){
+          cont[cont.length] = s;
+          graphstart(s);
+        });
+        document.getElementById('sigma-container-'+label).style.display = 'block';
+  }
   function graphstart(s) {
     //Params for Directed graph with visible edges
     s.settings('defaultEdgeType', 'arrow');
@@ -97,18 +150,17 @@
                       // si.cameras[0].goTo({x:nn['read_cam0:x'],y:nn['read_cam0:y'],ratio:0.55});
                     }
                 });
-
               }
             });
-
           }
         });
-
-        s.graph.edges().forEach(function(e) {
-          if (toKeep[e.source] && toKeep[e.target])
-            e.color = e.originalColor;
-          else
-            e.color = '#eee';
+        cont.forEach(function(si){
+            si.graph.edges().forEach(function(e) {
+              if (toKeep[e.source] && toKeep[e.target])
+                e.color = e.originalColor;
+              else
+                e.color = '#eee';
+            });
         });
 
         // Since the data has been modified, we need to
@@ -129,9 +181,8 @@
               si.graph.edges().forEach(function(e) {
                 e.color = e.originalColor;
               });
-        focus = null;
     });
-
+      focus = null;
       s.refresh();
       });
     }
@@ -150,32 +201,40 @@
 
 
   //TODO: Automatize this with GetLabels and query every single graph within a new container each time
-  sigma.neo4j.cypher(
-  { url: 'http://0.0.0.0:7474', user: 'neo4j', password: '87cEbq9d' },
-  'MATCH (n:Node2015) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m',
-  { container: 'sigma-container-2015'},
-    function(s){
-      cont[0] = s;
-      graphstart(s);
-    });
-  sigma.neo4j.cypher(
-  { url: 'http://0.0.0.0:7474', user: 'neo4j', password: '87cEbq9d' },
-  'MATCH (n:Node2017) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m',
-  { container: 'sigma-container-2017'},
-    function(s){
-      cont[1] = s;
-      graphstart(s);
-    });
+  // sigma.neo4j.cypher(
+  // { url: connect, user: login, password: pwd },
+  // 'MATCH (n:Node2015) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m',
+  // { container: 'sigma-container-2015'},
+  //   function(s){
+  //     cont[cont.length] = s;
+  //     graphstart(s);
+  //   });
+  // sigma.neo4j.cypher(
+  // { url: connect, user: login, password: pwd },
+  // 'MATCH (n:Node2017) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m',
+  // { container: 'sigma-container-2017'},
+  //   function(s){
+  //     cont[cont.length] = s;
+  //     graphstart(s);
+  //   });
+  //   sigma.neo4j.cypher(
+  //   { url: connect, user: login, password: pwd },
+  //   'MATCH (n:Nodeoall) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m',
+  //   { container: 'sigma-container-oall'},
+  //     function(s){
+  //       cont[cont.length] = s;
+  //       graphstart(s);
+  //     });
   // Calling neo4j to get all its relationship type
 sigma.neo4j.getTypes(
-        { url: 'http://0.0.0.0:7474', user:'neo4j', password:'87cEbq9d' },
+        { url: connect, user:login, password:pwd },
         function(rel) {
             console.log("Relationship types " + rel);
         }
 );
 // Calling neo4j to get all its node label
 sigma.neo4j.getLabels(
-        { url: 'http://0.0.0.0:7474', user:'neo4j', password:'87cEbq9d' },
+        { url: connect, user:login, password:pwd },
         function(labels) {
             console.log("Node labels " + labels);
         }
