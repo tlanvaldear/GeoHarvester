@@ -62,6 +62,8 @@
         }
     </style>
 <script>
+
+    //TODO:Make JSONfile out of it
   var queries = {
       "2015": "MATCH (n:Node2017) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
       "2017": "MATCH (n:Node2015) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
@@ -199,32 +201,6 @@
     return neighbors;
   });
 
-
-  //TODO: Automatize this with GetLabels and query every single graph within a new container each time
-  // sigma.neo4j.cypher(
-  // { url: connect, user: login, password: pwd },
-  // 'MATCH (n:Node2015) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m',
-  // { container: 'sigma-container-2015'},
-  //   function(s){
-  //     cont[cont.length] = s;
-  //     graphstart(s);
-  //   });
-  // sigma.neo4j.cypher(
-  // { url: connect, user: login, password: pwd },
-  // 'MATCH (n:Node2017) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m',
-  // { container: 'sigma-container-2017'},
-  //   function(s){
-  //     cont[cont.length] = s;
-  //     graphstart(s);
-  //   });
-  //   sigma.neo4j.cypher(
-  //   { url: connect, user: login, password: pwd },
-  //   'MATCH (n:Nodeoall) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m',
-  //   { container: 'sigma-container-oall'},
-  //     function(s){
-  //       cont[cont.length] = s;
-  //       graphstart(s);
-  //     });
   // Calling neo4j to get all its relationship type
 sigma.neo4j.getTypes(
         { url: connect, user:login, password:pwd },

@@ -32,4 +32,5 @@
 >
 > Dropdown menu to open 2015/2017 or 2015+2017 view
 >> **WIP** Will create GIS Hierarchy via SVG using Tulip.
+>>
 >> **KNOWN ISSUE** opening multiple times the same graph won't erase its previous instance
