@@ -34,3 +34,11 @@
 >> **WIP** Will create GIS Hierarchy via SVG using Tulip.
 >>
 >> **KNOWN ISSUE** opening multiple times the same graph won't erase its previous instance
+
+## 06/22 -
+> Replaced Dropdown Menu by Buttons.
+>> Edited ` query(label)` in order to fix 06/21's issue #2
+>
+> **TODO** link zoom/pan inbetween all opened containers
+>
+> Put JSApp on js/index.js
