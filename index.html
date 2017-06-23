@@ -1,59 +1,16 @@
-<!DOCTYPE html>
 <html>
 <head>
 <meta charset='utf-8'/>
-<title>GeoHarvester</title>
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
-<style type="text/css">
-        .btn {
-            display:inline-block;
-        }
-
-        /* Set height on the div or it will have zero height */
-        .sigma {
-            width: 50%;
-            height: 50%;
-        }
-        #sigma-container-2015 {
-            /*display:block;*/
-            float:left;
-            border-style: solid;
-            display: none;
-        }
-        #sigma-container-2017 {
-            /*display:block;*/
-            float:left;
-            border-style: solid;
-            /*overflow:hidden;*/
-            display: none;
-        }
-        #sigma-container-oall {
-            float:left;
-            border-style:solid;
-            display: none;
-        }
-        #sigma-container-emmm {
-            /*display:block;*/
-            float:right;
-            border-style: solid;
-            /*overflow:hidden;*/
-            display: none;
-        }
-    </style>
 </head>
 <body>
-
-<!-- Button conf. To add another button, copy one of the below ones, and just
-replace the 2015s by your new node label (4 letters) and your button name -->
-<div class="buttonplace">
-<button class="btn btn-primary" type="button" onClick="query('2015')">2015</button>
-<button class="btn btn-primary" type="button" onClick="query('2017')">2017</button>
-<button class="btn btn-primary" type="button" onClick="query('oall')">Fusion 2015+2017</button>
-</div>
-<!-- If you added a button for a new node type, remember to create its container.
-copy and paste the first one, and replace 2015 by the node label (4 letters) -->
+    <div>
+        <button class="btn btn-primary" type="button" onclick="query('2015')">2015</button>
+        <button class="btn btn-primary" type="button" onclick="query('2017')">2017</button>
+        <button class="btn btn-primary" type="button" onclick="query('oall')">Fusion</button>
+    </div>
 <div class="sigma" id="sigma-container-2015"></div>
 <div class="sigma" id="sigma-container-2017"></div>
 <div class="sigma" id="sigma-container-oall"></div>
@@ -65,7 +22,40 @@ copy and paste the first one, and replace 2015 by the node label (4 letters) -->
 <script src="plugins/sigma.layout.noverlap.min.js"></script>
 <script src="plugins/sigma.plugins.animate.min.js"></script>
 
+<style type="text/css">
 
+        /* Set height on the div or it will have zero height */
+        .sigma {
+            width: 49%;
+            height: 50%;
+        }
+        #sigma-container-2015 {
+            /*display:block;*/
+            float:left;
+            border-style: solid;
+            display: none;
+        }
+        #sigma-container-2017 {
+            /*display:block;*/
+            float:right;
+            border-style: solid;
+            /*overflow:hidden;*/
+            display: none;
+        }
+        #sigma-container-oall {
+            float:left;
+            border-style:solid;
+            margin-top:20px;
+            display: none;
+        }
+        #sigma-container-emmm {
+            /*display:block;*/
+            float:right;
+            border-style: solid;
+            /*overflow:hidden;*/
+            display: none;
+        }
+    </style>
 <script src="js/index.js"></script>
 </body>
 </html>

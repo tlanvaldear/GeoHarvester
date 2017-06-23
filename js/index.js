@@ -12,14 +12,13 @@ var xKeep = {};
 var yKeep = {};
 var cont = [];
 var ids = {};
-var defined= {};
+var deflab = {};
 function query(label){
-  if (defined[label] && document.getElementById('sigma-container-'+label).style.display == 'block'){
-      document.getElementById('sigma-container-'+label).style.display = 'none';
-      return;
+  if (deflab[label] == "true" && document.getElementById('sigma-container-'+label).style.display = 'block'){
+    document.getElementById('sigma-container-'+label).style.display = 'none';
+    return;
   }
-  else if (!defined[label]){
-      defined[label] = true;
+  if (!deflab[label]){
   sigma.neo4j.cypher(
   { url: connect, user: login, password: pwd },
   queries[label],
@@ -28,8 +27,9 @@ function query(label){
       cont[cont.length] = s;
       graphstart(s);
     });
-}
-document.getElementById('sigma-container-'+label).style.display = 'block';
+    deflab[label] = "true";
+  }
+  document.getElementById('sigma-container-'+label).style.display = 'block';
 }
 function graphstart(s) {
 //Params for Directed graph with visible edges
@@ -144,17 +144,17 @@ for (k in index)
 return neighbors;
 });
 
-  // Calling neo4j to get all its relationship type
+// Calling neo4j to get all its relationship type
 sigma.neo4j.getTypes(
-        { url: connect, user:login, password:pwd },
-        function(rel) {
-            console.log("Relationship types " + rel);
-        }
+    { url: connect, user:login, password:pwd },
+    function(rel) {
+        console.log("Relationship types " + rel);
+    }
 );
 // Calling neo4j to get all its node label
 sigma.neo4j.getLabels(
-        { url: connect, user:login, password:pwd },
-        function(labels) {
-            console.log("Node labels " + labels);
-        }
+    { url: connect, user:login, password:pwd },
+    function(labels) {
+        console.log("Node labels " + labels);
+    }
 );
