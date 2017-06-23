@@ -3,39 +3,18 @@
 <head>
 <meta charset='utf-8'/>
 <title>GeoHarvester</title>
+<!-- BOOTSRAP | ONLY FOR LOOKS | CAN BE REMOVED -->
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<!-- END OF REMOVABLE CONTENT -->
 <style type="text/css">
 
-        /* Set height on the div or it will have zero height */
         .sigma {
             width: 50%;
             height: 50%;
-        }
-        #sigma-container-2015 {
-            /*display:block;*/
             float:left;
             border-style: solid;
-            display: none;
-        }
-        #sigma-container-2017 {
-            /*display:block;*/
-            float:left;
-            border-style: solid;
-            /*overflow:hidden;*/
-            display: none;
-        }
-        #sigma-container-oall {
-            float:left;
-            border-style:solid;
-            display: none;
-        }
-        #sigma-container-emmm {
-            /*display:block;*/
-            float:left;
-            border-style: solid;
-            /*overflow:hidden;*/
             display: none;
         }
         .bg {
@@ -45,22 +24,26 @@
     </style>
 </head>
 <body>
+    <!--BUTTONS TO LOAD DATA / IN ORDER TO ADD SOME REMEMBER TO FIRST ADD IT TO DATABASE AND -->
     <div>
         <button class="btn btn-primary" type="button" onclick="query('2015')">2015</button>
         <button class="btn btn-primary" type="button" onclick="query('2017')">2017</button>
         <button class="btn btn-primary" type="button" onclick="query('oall')">Fusion</button>
     </div>
+    <!-- ADD A DIV TOO IN ORDER TO STOCK ITS CANVAS INTO THE VISUALIZATION TOOL UPON CLICK -->
 <div class="sigma" id="sigma-container-2015"><div class="bg">2015</div></div>
 <div class="sigma" id="sigma-container-2017"><div class="bg">2017</div></div>
 <div class="sigma" id="sigma-container-oall"><div class="bg">Overall</div></div>
-<div class="sigma" id="sigma-container-emmm"></div>
+<!-- SIGMA IMPORT -->
 <script src="js/sigma.js"></script>
 <script src="plugins/sigma.parsers.json.min.js"></script>
 <script src="plugins/sigma.neo4j.cypher.min.js"></script>
 <script src="plugins/sigma.layout.forceAtlas2.min.js"></script>
 <script src="plugins/sigma.layout.noverlap.min.js"></script>
 <script src="plugins/sigma.plugins.animate.min.js"></script>
+<!-- SIGMA APP IMPORT -->
 <script src="js/index.js"></script>
+<!-- APP INITIALISATION -->
 <script>window.onload = query('oall');</script>
 </body>
 </html>

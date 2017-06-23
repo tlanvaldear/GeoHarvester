@@ -1,10 +1,14 @@
 //TODO:Make JSONfile out of it
 // #ff6666 NEW - #b5c2ec NONEXISTANT
+
+//IF YOU ADDDED A BUTTON PLEASE CREATE A NEW LINE FOR THE QUERY
+// YOU CAN USE THE BASIC QUERIES THAT ARE ALREADY WRITTEN - JUST
+// REMEMBER TO REPLACE THE LAST FOUR LETTERS OF THE NODELABEL TO YOUR
+// NEW LABEL'S ONE.
 var queries = {
   "2015": "MATCH (n:Node2015) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
   "2017": "MATCH (n:Node2017) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
   "oall": "MATCH (n:Nodeoall) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
-  "eaniemeanieminymoe" : "MATCH (n)-[r]->(m) RETURN r,n,m",
 };
 var pwd = '87cEbq9d';
 var login = 'neo4j';
