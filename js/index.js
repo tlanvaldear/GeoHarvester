@@ -1,4 +1,5 @@
 //TODO:Make JSONfile out of it
+// #ff6666 NEW - #b5c2ec NONEXISTANT
 var queries = {
   "2015": "MATCH (n:Node2015) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
   "2017": "MATCH (n:Node2017) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
@@ -19,10 +20,15 @@ function query(label){
     return;
   }
   if (!deflab[label]){
+      var s = new sigma({
+  renderer: {
+    container: document.getElementById('sigma-container-'+label),
+    type: 'canvas'
+}});
   sigma.neo4j.cypher(
   { url: connect, user: login, password: pwd },
   queries[label],
-  { container: 'sigma-container-'+label},
+  s,
     function(s){
       cont[cont.length] = s;
       cont[cont.length-1].sh = true;
@@ -40,7 +46,7 @@ function query(label){
 function graphstart(s) {
 //Params for Directed graph
 s.settings('defaultEdgeType', 'arrow');
-s.settings('minArrowSize', 100);
+s.settings('minArrowSize', 10);
 //Camera for recentering on node after click
 s.addCamera('cam0');
 var listener = s.configNoverlap({nodeMargin: 1, scaleNodes: 1.05, gridSize: 75, duration: 1});

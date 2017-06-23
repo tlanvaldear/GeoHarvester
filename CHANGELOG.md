@@ -45,6 +45,8 @@
 
 ## 06/23 -
 > Fixed "*bug*" on the Button trigger event that led browser's js console to crash
->> Changes made to the code: Nearly none, simply changed var names. Actually, I moved back to the previous commit and copied the code from master into it, then changed the dropdown menu to buttons, and that was it... Backuped the files, got to master, and commited the changes...
+>> Changes made to the code: Removed Doctype.
 >
+> Graphs that were hidden back by the user are now actualized to the current selection if any (restarts forceAtlas for the moment)
 >
+> Switched to Canvas Mode to make graphs great again with more seeable arrows
