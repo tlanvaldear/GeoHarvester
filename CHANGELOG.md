@@ -42,3 +42,9 @@
 > **TODO** link zoom/pan inbetween all opened containers
 >
 > Put JSApp on js/index.js
+
+## 06/23 -
+> Fixed "*bug*" on the Button trigger event that led browser's js console to crash
+>> Changes made to the code: Nearly none, simply changed var names. Actually, I moved back to the previous commit and copied the code from master into it, then changed the dropdown menu to buttons, and that was it... Backuped the files, got to master, and commited the changes...
+>
+>

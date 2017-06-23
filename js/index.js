@@ -14,7 +14,7 @@ var cont = [];
 var ids = {};
 var deflab = {};
 function query(label){
-  if (deflab[label] == "true" && document.getElementById('sigma-container-'+label).style.display = 'block'){
+  if (deflab[label] == "true" && document.getElementById('sigma-container-'+label).style.display == 'block'){
     document.getElementById('sigma-container-'+label).style.display = 'none';
     return;
   }
@@ -25,14 +25,20 @@ function query(label){
   { container: 'sigma-container-'+label},
     function(s){
       cont[cont.length] = s;
+      cont[cont.length-1].sh = true;
       graphstart(s);
     });
     deflab[label] = "true";
   }
+  cont.forEach(function(si){
+      if (!si.isForceAtlas2Running() && document.getElementById(si.renderers[0].container.id).style.display != 'block'){
+          si.startForceAtlas2();
+  }
+  });
   document.getElementById('sigma-container-'+label).style.display = 'block';
 }
 function graphstart(s) {
-//Params for Directed graph with visible edges
+//Params for Directed graph
 s.settings('defaultEdgeType', 'arrow');
 s.settings('minArrowSize', 100);
 //Camera for recentering on node after click
@@ -99,13 +105,11 @@ var focus;
         });
       }
     });
-    cont.forEach(function(si){
-        si.graph.edges().forEach(function(e) {
+    s.graph.edges().forEach(function(e) {
           if (toKeep[e.source] && toKeep[e.target])
             e.color = e.originalColor;
           else
             e.color = '#eee';
-        });
     });
 
     // Since the data has been modified, we need to
