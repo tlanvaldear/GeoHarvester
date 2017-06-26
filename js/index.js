@@ -69,10 +69,22 @@ var focus;
   // nodes and edges, like this:
   s.graph.nodes().forEach(function(n) {
       if (n.neo4j_data['year'] == "2015"){
-          n.color = '#b5c2ec'; // purple
+          if (cbmode == true){
+              n.type = 'square';
+          }
+          else{
+              n.type = 'square';
+              n.color = '#b5c2ec';
+        }
       }
       else if (n.neo4j_data['year'] == "2017"){
-          n.color = '#ff6666'; // orange
+          if (cbmode == true){
+              n.type = 'diamond';
+          }
+          else{
+              n.type = 'diamond'
+              n.color = '#ff6666'; // orange
+        }
       }
     n.originalColor = n.color;
     n.label = n.neo4j_data['name'];
@@ -81,9 +93,10 @@ var focus;
   s.graph.edges().forEach(function(e) {
       if (e.neo4j_data['year'] == "2015"){
           if (cbmode == true){
-              e.type = 'dashed'
+              e.type = 'dashed';
           }
           else{
+              e.type = 'dashed';
               e.color = '#b5c2ec';
         }
       }
@@ -92,6 +105,7 @@ var focus;
               e.type = 'dotted';
         }
         else{
+            e.type = 'dotted';
             e.color = '#ff6666';
         }
       }

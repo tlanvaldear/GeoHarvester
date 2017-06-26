@@ -38,13 +38,13 @@
         <button class="btn btn-primary" type="button" onclick="query('2015')">2015</button>
         <button class="btn btn-primary" type="button" onclick="query('2017')">2017</button>
         <button class="btn btn-primary" type="button" onclick="query('Oall')">Fusion</button>
-        <button class="btn btn-primary" type="button" onclick="cbmode_e()">Color Blind Mode</button>
+        <button class="btn btn-primary" type="button" onclick="cbmode_e()">Color Blind</button>
     </div>
     <!-- ADD A DIV TOO IN ORDER TO STOCK ITS CANVAS INTO THE VISUALIZATION TOOL UPON CLICK -->
 <div class="sigma" id="sigma-container-2015"><div class="bg">2015</div></div>
 <div class="sigma" id="sigma-container-2017"><div class="bg">2017</div></div>
 <div class="sigma" id="sigma-container-Oall"><div class="bg">Overall</div></div>
- <br/> Légende : <font size="2">Pour le graphe Overall / Les couleurs correspondent au texte affiché. Le texte correspond au color-blind mode</font><p class="past">Arête en tirets et Noeuds carrés: - N'existe plus</p><p class="now">Arête en pointillés et Noeuds en diamant: Est arrivé cette année</p><p class="no">Reste: Inchangé </p> <font size="2"> Pour voir les pointes des arêtes spéciales (non-existantes ou récentes), ouvrez le graphe correspondant ou désactivez le mode color-blind.</font>
+ <br/> Légende : <font size="2">Pour le graphe Overall / Les couleurs correspondent au texte affiché. Le texte correspond au mode color-blind </font><p class="past">Arête en tirets et Noeuds carrés: - N'existe plus</p><p class="now">Arête en pointillés et Noeuds en diamant: Est arrivé cette année</p><p class="no">Reste: Inchangé </p> <font size="2"> Pour voir les pointes des arêtes spéciales (non-existantes ou récentes), ouvrez le graphe correspondant.</font>
 <!-- SIGMA IMPORT -->
 <script src="js/sigma.js"></script>
 <script src="plugins/sigma.parsers.json.min.js"></script>
@@ -53,6 +53,7 @@
 <script src="plugins/sigma.layout.noverlap.min.js"></script>
 <script src="plugins/sigma.plugins.animate.min.js"></script>
 <script src="plugins/sigma.renderers.customEdgeShapes.min.js"></script>
+<script src="plugins/sigma.renderers.customShapes.min.js"></script>
 <!-- SIGMA APP IMPORT -->
 <script src="js/index.js"></script>
 <!-- APP INITIALISATION -->
