@@ -50,3 +50,12 @@
 > Graphs that were hidden back by the user are now actualized to the current selection if any (restarts forceAtlas for the moment)
 >
 > Switched to Canvas Mode to make graphs great again with more seeable arrows
+
+## 06/26 -
+> Added diffGraph that shows differences between two years
+>
+> Added script to create a diffGraph from two years' nodes already in the database
+>
+> Added color-code and shape-code on diffGraph
+>> Set up Color-blind mode in order to avoid visualization difficulties for color-blind people
+>
