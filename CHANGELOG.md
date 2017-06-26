@@ -61,3 +61,6 @@
 > Added color-code and shape-code on diffGraph
 >> Set up Color-blind mode in order to avoid visualization difficulties for color-blind people
 >
+> Replaced Hover-stop for ForceAtlas by Timer.
+>
+> **KNOWN ISSUE** Opening >2 views leads to errors. Going to watch for this.
