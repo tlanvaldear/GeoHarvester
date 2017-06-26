@@ -8,7 +8,7 @@
 var queries = {
   "2015": "MATCH (n:Node2015) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
   "2017": "MATCH (n:Node2017) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
-  "oall": "MATCH (n:Nodeoall) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
+  "Oall": "MATCH (n:NodeOall) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
 };
 var pwd = '87cEbq9d';
 var login = 'neo4j';
@@ -18,6 +18,17 @@ var yKeep = {};
 var cont = [];
 var ids = {};
 var deflab = {};
+var cbmode = false;
+
+function cbmode_e(){
+    cbmode = !cbmode;
+    cont.forEach(function(si){
+        si.kill();
+    })
+    cont = [];
+    deflab = {};
+    query('Oall');
+}
 function query(label){
   if (deflab[label] == "true" && document.getElementById('sigma-container-'+label).style.display == 'block'){
     document.getElementById('sigma-container-'+label).style.display = 'none';
@@ -35,7 +46,6 @@ function query(label){
   s,
     function(s){
       cont[cont.length] = s;
-      cont[cont.length-1].sh = true;
       graphstart(s);
     });
     deflab[label] = "true";
@@ -58,11 +68,33 @@ var focus;
   // We first need to save the original colors of our
   // nodes and edges, like this:
   s.graph.nodes().forEach(function(n) {
+      if (n.neo4j_data['year'] == "2015"){
+          n.color = '#b5c2ec'; // purple
+      }
+      else if (n.neo4j_data['year'] == "2017"){
+          n.color = '#ff6666'; // orange
+      }
     n.originalColor = n.color;
     n.label = n.neo4j_data['name'];
     s.refresh();
   });
   s.graph.edges().forEach(function(e) {
+      if (e.neo4j_data['year'] == "2015"){
+          if (cbmode == true){
+              e.type = 'dashed'
+          }
+          else{
+              e.color = '#b5c2ec';
+        }
+      }
+      else if (e.neo4j_data['year'] == "2017"){
+          if (cbmode == true){
+              e.type = 'dotted';
+        }
+        else{
+            e.color = '#ff6666';
+        }
+      }
     e.originalColor = e.color;
   });
   s.startForceAtlas2({
