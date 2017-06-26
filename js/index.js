@@ -42,7 +42,7 @@ function query(label){
 }});
   sigma.neo4j.cypher(
   { url: connect, user: login, password: pwd },
-  queries[label],
+  queries[label], //check for any possibility to use cypher.getLabels in order to get a full queries json object. Can easily be done in Python, though
   s,
     function(s){
       cont[cont.length] = s;
@@ -127,10 +127,10 @@ var focus;
         worker: true
     });
   s.startNoverlap();
-  s.bind('overNode',function(e) {
+  setInterval( function(){
+      s.stopForceAtlas2();
+}, 3000);
     //if a node is hovered, stop Forces from calculating
-    s.stopForceAtlas2();
-  });
   s.bind('clickNode', function(e) {
     var nodeId = e.data.node.id,
         toKeep = s.graph.neighbors(nodeId);
@@ -212,9 +212,13 @@ sigma.neo4j.getTypes(
     }
 );
 // Calling neo4j to get all its node label
+// TODO: find a way to get queries(label) working on this one...
+// Currently leads to sigma error 'data property on undefined'... 
 sigma.neo4j.getLabels(
     { url: connect, user:login, password:pwd },
     function(labels) {
-        console.log("Node labels " + labels);
+        labels.forEach(function(label){
+            queries[label] = "MATCH (n:"+label+") OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m"
+        });
     }
 );
