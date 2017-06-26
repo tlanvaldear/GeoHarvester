@@ -56,7 +56,7 @@
 >
 > Added script to create a diffGraph from two years' nodes already in the database
 >
-> Added dbImport scripts from Tulip CSVs. see (9f1f347)[https://github.com/tlanvaldear/GeoHarvester/commit/9f1f347e066a7ccd4a49e2102ecf187acb4aae4b]
+> Added dbImport scripts from Tulip CSVs. see [9f1f347](https://github.com/tlanvaldear/GeoHarvester/commit/9f1f347e066a7ccd4a49e2102ecf187acb4aae4b)
 >
 > Added color-code and shape-code on diffGraph
 >> Set up Color-blind mode in order to avoid visualization difficulties for color-blind people
