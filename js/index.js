@@ -259,7 +259,8 @@ var focus;
           si.graph.edges().forEach(function(e) {
             e.color = e.originalColor;
           });
-});
+          si.refresh();
+      });
   focus = null;
   s.refresh();
   });
@@ -277,13 +278,6 @@ for (k in index)
 return neighbors;
 });
 
-// Calling neo4j to get all its relationship type
-sigma.neo4j.getTypes(
-    { url: connect, user:login, password:pwd },
-    function(rel) {
-        console.log("Relationship types " + rel);
-    }
-);
 // Calling neo4j to get all its node label
 // TODO: find a way to get queries(label) working on this one...
 // Currently leads to sigma error 'data property on undefined'...
