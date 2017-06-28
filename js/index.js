@@ -20,6 +20,49 @@ var ids = {};
 var deflab = {};
 var cbmode = false;
 
+function progressive(){
+    var hide = []; //hidden nodes
+    var hide2 = []; // in order to sort by 2015 > 2017 quick
+    var i = 0;
+    var sinstance;
+    cont.forEach(function(si){
+        if (si.l == "Oall"){
+            sinstance = si;
+            si.graph.nodes().forEach(function(n){
+                if (n.neo4j_data['year'] == "2015"){
+                    n.hidden = false;
+                    hide.push(n)
+                }
+                else if (n.neo4j_data['year'] == "2017"){
+                    n.hidden = true;
+                    hide2.push(n);
+                }
+                si.refresh();
+            });
+          };
+          hide2.forEach(function(n){
+              hide.push(n);
+          })
+    });
+    hide.forEach(function(n){
+        i++;
+        if (i > hide.length){
+            hide = [];
+            return;
+        }
+        setTimeout( function(){
+                if (n.neo4j_data['year'] == "2015"){
+                    n.hidden = true;
+                }
+                else{
+                    n.hidden = false;
+                }
+                sinstance.refresh();
+                console.log("refresh")
+            }, 3000);
+        });
+};
+
 function cbmode_e(){
     cbmode = !cbmode;
     cont.forEach(function(si){
@@ -46,6 +89,7 @@ function query(label){
   s,
     function(s){
       cont[cont.length] = s;
+      cont[cont.length-1].l = label;
       graphstart(s);
     });
     deflab[label] = "true";
@@ -127,9 +171,9 @@ var focus;
         worker: true
     });
   s.startNoverlap();
-  setInterval( function(){
+  setTimeout( function(){
       s.stopForceAtlas2();
-}, 3000);
+}, 5000);
     //if a node is hovered, stop Forces from calculating
   s.bind('clickNode', function(e) {
     var nodeId = e.data.node.id,
@@ -213,7 +257,7 @@ sigma.neo4j.getTypes(
 );
 // Calling neo4j to get all its node label
 // TODO: find a way to get queries(label) working on this one...
-// Currently leads to sigma error 'data property on undefined'... 
+// Currently leads to sigma error 'data property on undefined'...
 sigma.neo4j.getLabels(
     { url: connect, user:login, password:pwd },
     function(labels) {

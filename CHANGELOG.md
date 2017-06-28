@@ -64,3 +64,9 @@
 > Replaced Hover-stop for ForceAtlas by Timer.
 >
 > **KNOWN ISSUE** Opening >2 views leads to errors. Going to watch for this.
+
+## 06/28 -
+> Added Progressive mode to see more efficiently differences between 2015 && 2017
+>> Still needs edges to be dealt with
+> 
+>
