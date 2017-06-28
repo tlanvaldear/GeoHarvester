@@ -65,6 +65,7 @@ function progressive(){
 function cbmode_e(){
     cbmode = !cbmode;
     cont.forEach(function(si){
+        query(si.l);
         si.kill();
     })
     cont = [];
