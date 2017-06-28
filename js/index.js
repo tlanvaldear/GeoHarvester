@@ -23,6 +23,8 @@ var cbmode = false;
 function progressive(){
     var hide = []; //hidden nodes
     var hide2 = []; // in order to sort by 2015 > 2017 quick
+    var hidedges = [];
+    var showedges = [];
     var i = 0;
     var sinstance;
     cont.forEach(function(si){
@@ -38,6 +40,24 @@ function progressive(){
                     hide2.push(n);
                 }
                 si.refresh();
+            });
+            si.graph.edges().forEach(function(e){
+                if (e.neo4j_data['year'] == "2015"){
+                    e.hidden = false;
+                    si.refresh();
+                    setTimeout(function(){
+                        e.hidden = true;
+                        si.refresh();
+                    }, 3000)
+                }
+                else if (e.neo4j_data['year'] == "2017"){
+                    e.hidden = true;
+                    si.refresh();
+                    setTimeout(function(){
+                        e.hidden = false;
+                        si.refresh();
+                    }, 3000)
+                }
             });
           };
           hide2.forEach(function(n){
@@ -98,6 +118,9 @@ function query(label){
   cont.forEach(function(si){
       if (!si.isForceAtlas2Running() && document.getElementById(si.renderers[0].container.id).style.display != 'block'){
           si.startForceAtlas2();
+          setTimeout( function(){
+              si.stopForceAtlas2();
+        }, 5000);
   }
   });
   document.getElementById('sigma-container-'+label).style.display = 'block';
