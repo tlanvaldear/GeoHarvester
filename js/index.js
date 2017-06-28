@@ -58,7 +58,6 @@ function progressive(){
                     n.hidden = false;
                 }
                 sinstance.refresh();
-                console.log("refresh")
             }, 3000);
         });
 };
@@ -90,6 +89,7 @@ function query(label){
     function(s){
       cont[cont.length] = s;
       cont[cont.length-1].l = label;
+      cont[cont.length-1].explored = false;
       graphstart(s);
     });
     deflab[label] = "true";
@@ -181,7 +181,7 @@ var focus;
     toKeep[nodeId] = e.data.node;
 
     s.graph.nodes().forEach(function(n) {
-      ids[n.id] = n;
+      ids[nodeId] = n;
       if (toKeep[n.id])
         n.color = n.originalColor;
       else{
@@ -191,14 +191,14 @@ var focus;
         focus = n;
         s.cameras[0].goTo({x:focus['read_cam0:x'],y:focus['read_cam0:y'],ratio:0.55});
         cont.forEach(function(si){
-          if (si != s){
+          if (si != s && !si.explored){
+              si.explored = true;
             si.graph.nodes().forEach(function(nn){
                 if (nn.label == n.label && !ids[nn.id]){
                   ids[nn.id] = nn;
                   var ev = e;
                   ev.data.node = nn;
                   si.dispatchEvent('clickNode',ev.data);
-                  // si.cameras[0].goTo({x:nn['read_cam0:x'],y:nn['read_cam0:y'],ratio:0.55});
                 }
             });
           }
@@ -218,6 +218,11 @@ var focus;
     s.refresh();
     ids = [];
   });
+  s.bind('click',function(e){
+      cont.forEach(function(si){
+          si.explored = false;
+      })
+  })
   s.bind('clickStage', function(e) {
     cont.forEach(function(si){
         si.graph.nodes().forEach(function(n) {

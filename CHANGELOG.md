@@ -68,5 +68,6 @@
 ## 06/28 -
 > Added Progressive mode to see more efficiently differences between 2015 && 2017
 >> Still needs edges to be dealt with
-> 
+>
+> Fixed issue on Opening >2 views with more patching-up
 >
