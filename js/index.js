@@ -85,8 +85,13 @@ function progressive(){
 function cbmode_e(){
     cbmode = !cbmode;
     cont.forEach(function(si){
+        if (deflab[si.l] == "true" && document.getElementById('sigma-container-'+si.l).style.display == 'none'){
+            si.kill();
+        }
+        else{
         query(si.l);
         si.kill();
+    }
     })
     cont = [];
     deflab = {};

@@ -75,3 +75,4 @@
 >
 > Fixed **06/21** issue on clickStage event not properly handled
 >
+> Thinking about other visualization tools in order to show more examples of differences
