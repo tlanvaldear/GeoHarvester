@@ -75,4 +75,6 @@
 >
 > Fixed **06/21** issue on clickStage event not properly handled
 >
+> Fixed bug on Color-blind mode that occured if a sigma instance was running inside of a non-displayed container.
+>
 > Thinking about other visualization tools in order to show more examples of differences
