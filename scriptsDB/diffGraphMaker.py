@@ -1,8 +1,9 @@
 #!/usr/bin/python3
+# -*- coding:utf-8 -*-
 
 from neo4j.v1 import GraphDatabase, basic_auth
 import sys
-driver = GraphDatabase.driver("bolt://localhost", auth=basic_auth("neo4j", "87cEbq9d"))
+driver = GraphDatabase.driver("bolt://localhost", auth=basic_auth("neo4j", "tv38çqPL"))
 session = driver.session()
 def usage():
 	print("usage : diffGraphMaker.py NODETYPE1 NODETYPE2 OverallNodeType")

@@ -10,7 +10,7 @@ var queries = {
   "2017": "MATCH (n:Node2017) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
   "Oall": "MATCH (n:NodeOall) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
 };
-var pwd = '87cEbq9d';
+var pwd = 'tv38çqPL';
 var login = 'neo4j';
 var connect = 'http://0.0.0.0:7474';
 var xKeep = {};
@@ -82,6 +82,32 @@ function progressive(){
         });
 };
 
+function search_s(){
+  console.log("hi")
+  var input = document.getElementById("gisearch");
+  var ncs = input.value.toUpperCase();
+  var focus = null;
+  cont.forEach(function(si){
+    if (si.l == "Oall"){
+      si.graph.nodes().forEach(function(n){
+        if (n.neo4j_data['name'].toUpperCase() === ncs){
+          focus = n;
+        }
+      });
+      if (focus != null){
+        var evdata;
+        evdata = si.getEvent('clickNode');
+        evdata.node = focus;
+        si.dispatchEvent('clickNode',evdata);
+      }
+    }
+    if (focus == null){
+      si.dispatchEvent('clickStage');
+    }
+    si.explored = false;
+  })
+}
+
 function cbmode_e(){
     cbmode = !cbmode;
     cont.forEach(function(si){
@@ -136,7 +162,7 @@ s.settings('defaultEdgeType', 'arrow');
 s.settings('minArrowSize', 10);
 //Camera for recentering on node after click
 s.addCamera('cam0');
-var listener = s.configNoverlap({nodeMargin: 1, scaleNodes: 1.05, gridSize: 75, duration: 1});
+var listener = s.configNoverlap({nodeMargin: 1.5, scaleNodes: 1.05, gridSize: 75, duration: 1});
 var focus;
   // We first need to save the original colors of our
   // nodes and edges, like this:
@@ -187,23 +213,22 @@ var focus;
   s.startForceAtlas2({
         linLogMode: true,
         outboundAttractionDistribution: !1,
-        adjustSizes: false,
+        adjustSizes: !1,
         edgeWeightInfluence: 0,
-        scalingRatio: 0.5,
+        scalingRatio: 1,
         strongGravityMode: !1,
         gravity: 1,
-        barnesHutOptimize: false,
+        barnesHutOptimize: true,
         barnesHutTheta: 0.5,
         slowDown: 1,
         startingIterations: 1,
         iterationsPerRender: 1,
         worker: true
     });
-  s.startNoverlap();
   setTimeout( function(){
       s.stopForceAtlas2();
+      s.startNoverlap();
 }, 5000);
-    //if a node is hovered, stop Forces from calculating
   s.bind('clickNode', function(e) {
     var nodeId = e.data.node.id,
         toKeep = s.graph.neighbors(nodeId);
@@ -225,9 +250,9 @@ var focus;
             si.graph.nodes().forEach(function(nn){
                 if (nn.label == n.label && !ids[nn.id]){
                   ids[nn.id] = nn;
-                  var ev = e;
-                  ev.data.node = nn;
-                  si.dispatchEvent('clickNode',ev.data);
+                  var ev = si.getEvent('clickNode');
+                  ev.node = nn;
+                  si.dispatchEvent('clickNode',ev);
                 }
             });
           }
