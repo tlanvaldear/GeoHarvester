@@ -78,3 +78,10 @@
 > Fixed bug on Color-blind mode that occured if a sigma instance was running inside of a non-displayed container.
 >
 > Thinking about other visualization tools in order to show more examples of differences
+
+## 06/29 -
+> Added research bar to ease specific view on a specific GIS
+>
+> Added ideas from 06/28 into *ideas.md*
+>
+> 
