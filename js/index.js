@@ -31,7 +31,7 @@ function progressive(){
     var sinstance;
     var div;
     cont.forEach(function(si){
-        if (si.l == "Oall"){
+        if (si.l == "NodeOall"){
             div = document.getElementById(si.renderers[0].container.id);
             div.style.height = "80%";
             div.style.width = "80%";
