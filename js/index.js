@@ -54,7 +54,7 @@ function progressive(){
                     setTimeout(function(){
                         e.hidden = true;
                         si.refresh();
-                    }, 3000)
+                    }, 5000)
                 }
                 else if (e.neo4j_data['year'] == "2017"){
                     e.hidden = true;
@@ -62,7 +62,7 @@ function progressive(){
                     setTimeout(function(){
                         e.hidden = false;
                         si.refresh();
-                    }, 3000)
+                    }, 5000)
                 }
             });
           };
@@ -84,13 +84,13 @@ function progressive(){
                     n.hidden = false;
                 }
                 sinstance.refresh();
-            }, 3000);
+            }, 5000);
         });
     setTimeout(function(){
       div.style.height = "50%";
       div.style.width = "50%";
       sinstance.refresh();
-    }, 5000);
+    }, 7000);
 };
 
 function search_s(){
@@ -157,6 +157,18 @@ function query(label){
       cont[cont.length] = s;
       cont[cont.length-1].l = label;
       cont[cont.length-1].explored = false;
+      var frListener = sigma.layouts.fruchtermanReingold.configure(s, {
+  iterations: 500,
+  easing: 'quadraticInOut',
+  duration: 800
+});
+// Bind the events:
+frListener.bind('start stop interpolate', function(e) {
+  console.log(e.type);
+});
+// Start the Fruchterman-Reingold algorithm:
+sigma.layouts.fruchtermanReingold.start(s);
+
       graphstart(s);
     }
     catch(e){
@@ -169,15 +181,15 @@ function query(label){
     });
     deflab[label] = "true";
   }
-  cont.forEach(function(si){
-      if (!si.isForceAtlas2Running() && document.getElementById(si.renderers[0].container.id).style.display != 'block'){
-          si.startForceAtlas2();
-          setTimeout( function(){
-              si.stopForceAtlas2();
-              si.startNoverlap();
-        }, 5000);
-  }
-  });
+  // cont.forEach(function(si){
+  //     if (!si.isForceAtlas2Running() && document.getElementById(si.renderers[0].container.id).style.display != 'block'){
+  //         si.startForceAtlas2();
+  //         setTimeout( function(){
+  //             si.stopForceAtlas2();
+  //             si.startNoverlap();
+  //       }, 5000);
+  // }
+  // });
   document.getElementById('sigma-container-'+label.slice(-4)).style.display = 'block';
 }
 function graphstart(s) {
@@ -239,25 +251,25 @@ var focus;
       }
     e.originalColor = e.color;
   });
-  s.startForceAtlas2({
-        linLogMode: true,
-        outboundAttractionDistribution: !1,
-        adjustSizes: !1,
-        edgeWeightInfluence: 0,
-        scalingRatio: 1,
-        strongGravityMode: !1,
-        gravity: 1,
-        barnesHutOptimize: true,
-        barnesHutTheta: 0.5,
-        slowDown: 1,
-        startingIterations: 1,
-        iterationsPerRender: 1,
-        worker: true
-    });
-  setTimeout( function(){
-      s.stopForceAtlas2();
-      s.startNoverlap();
-}, 5000);
+//   s.startForceAtlas2({
+//         linLogMode: true,
+//         outboundAttractionDistribution: !1,
+//         adjustSizes: !1,
+//         edgeWeightInfluence: 0,
+//         scalingRatio: 1,
+//         strongGravityMode: !1,
+//         gravity: 1,
+//         barnesHutOptimize: true,
+//         barnesHutTheta: 0.5,
+//         slowDown: 1,
+//         startingIterations: 1,
+//         iterationsPerRender: 1,
+//         worker: true
+//     });
+//   setTimeout( function(){
+//       s.stopForceAtlas2();
+//       s.startNoverlap();
+// }, 5000);
   s.bind('clickNode', function(e) {
     var nodeId = e.data.node.id,
         toKeep = s.graph.neighbors(nodeId);
