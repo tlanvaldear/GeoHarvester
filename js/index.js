@@ -97,11 +97,12 @@ function search_s(){
   console.log("search_s");
   var input = document.getElementById("gisearch");
   var ncs = input.value.toUpperCase();
+  console.log(ncs)
   var focus = null;
   cont.forEach(function(si){
-    if (si.l == "Oall"){
+    if (si.l == "NodeOall"){
       si.graph.nodes().forEach(function(n){
-        if (n.neo4j_data['name'].toUpperCase() === ncs){
+        if (n.neo4j_data['name'].toUpperCase() == ncs){
           focus = n;
         }
       });
@@ -123,7 +124,7 @@ function cbmode_e(){
   console.log("cbmode_e")
     cbmode = !cbmode;
     cont.forEach(function(si){
-        if (deflab[si.l] == "true" && document.getElementById('sigma-container-'+si.l).style.display == 'none'){
+        if (deflab[si.l] == "true" && document.getElementById('sigma-container-'+si.l.slice(-4)).style.display == 'none'){
             si.kill();
         }
         else{
@@ -133,7 +134,7 @@ function cbmode_e(){
     })
     cont = [];
     deflab = {};
-    query('Oall');
+    query('NodeOall');
 }
 function query(label){
   console.log("query")
@@ -182,8 +183,9 @@ function query(label){
 function graphstart(s) {
   console.log("Graphstart")
 //Params for Directed graph
-s.settings('defaultEdgeType', 'arrow');
+s.settings('defaultEdgeType', 'curvedArrow');
 s.settings('minArrowSize', 10);
+s.settings('drawLabels',false);
 //Camera for recentering on node after click
 s.addCamera('cam0');
 var listener = s.configNoverlap({nodeMargin: 1.5, scaleNodes: 1.05, gridSize: 75, duration: 1});
@@ -233,7 +235,7 @@ var focus;
         }
       }
       else {
-        e.type = 'arrow';
+        e.type = 'curvedArrow';
       }
     e.originalColor = e.color;
   });
