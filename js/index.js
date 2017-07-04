@@ -315,15 +315,25 @@ var focus;
 }
 // Add a method to the graph model that returns an
 // object with out neighbors of a node inside:
-sigma.classes.graph.addMethod('neighbors', function(nodeId) {
+sigma.classes.graph.addMethod('neighbors1', function(nodeId) {
 var k,
     neighbors = {},
-    index = desc?this.outNeighborsIndex[nodeId] || {}:this.allNeighborsIndex[nodeId] || {};
+    index = this.outNeighborsIndex[nodeId];
 
 for (k in index)
   neighbors[k] = this.nodesIndex[k];
 
 return neighbors;
+});
+
+sigma.classes.graph.addMethod('neighbors', function(nodeId) {
+        var i,
+            neighbors = {},
+            index = this.outNeighborsIndex.get(nodeId).keyList() || {};
+            for (i = 0; i < index.length; i++) {
+                neighbors[index[i]] = this.nodesIndex.get(index[i]);
+            }
+        return neighbors;
 });
 
 // Calling neo4j to get all its node label

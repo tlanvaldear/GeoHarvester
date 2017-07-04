@@ -3,6 +3,17 @@
 
   var __instances = {};
 
+  // Deal with resize.  skip this for node.js apps
+  if (typeof window != 'undefined')
+    window.addEventListener('resize', function() {
+      for (var key in __instances) {
+        if (__instances.hasOwnProperty(key)) {
+          var instance = __instances[key];
+          instance.refresh();
+        }
+      }
+    });
+
   /**
    * This is the sigma instances constructor. One instance of sigma represent
    * one graph. It is possible to represent this grapĥ with several renderers
@@ -74,8 +85,7 @@
 
     // Private attributes:
     // *******************
-    var _self = this,
-        _conf = conf || {};
+    var _conf = conf || {};
 
     // Little shortcut:
     // ****************
@@ -176,10 +186,7 @@
         'doubleClickNodes',
         'rightClickNode',
         'rightClickNodes',
-        'overNode',
-        'overNodes',
-        'outNode',
-        'outNodes',
+        'hovers',
         'downNode',
         'downNodes',
         'upNode',
@@ -223,11 +230,6 @@
       this.refresh();
     }
 
-    // Deal with resize:
-    window.addEventListener('resize', function() {
-      if (_self.settings)
-        _self.refresh();
-    });
   };
 
 
@@ -266,7 +268,8 @@
     }
 
     camera.bind('coordinatesUpdated', function(e) {
-      self.renderCamera(camera, camera.isAnimated);
+      self.dispatchEvent('coordinatesUpdated');
+      self.renderCamera(camera);
     });
 
     this.renderersPerCamera[id] = [];
@@ -401,14 +404,7 @@
           'rightClickNodes',
           'rightClickEdge',
           'rightClickEdges',
-          'overNode',
-          'overNodes',
-          'overEdge',
-          'overEdges',
-          'outNode',
-          'outNodes',
-          'outEdge',
-          'outEdges',
+          'hovers',
           'downNode',
           'downNodes',
           'downEdge',
@@ -529,8 +525,9 @@
         );
 
         // Refresh quadtree:
-        c.quadtree.index(this.graph.nodes(), {
+        c.quadtree.index(this.graph, {
           prefix: c.readPrefix,
+          maxLevel: c.settings('nodeQuadtreeMaxLevel'),
           bounds: {
             x: bounds.minX,
             y: bounds.minY,
@@ -543,10 +540,12 @@
         if (
           c.edgequadtree !== undefined &&
           c.settings('drawEdges') &&
-          c.settings('enableEdgeHovering')
+          (c.settings('enableEdgeHovering') ||
+            c.settings('edgesClippingWithNodes'))
         ) {
           c.edgequadtree.index(this.graph, {
             prefix: c.readPrefix,
+            maxLevel: c.settings('edgeQuadtreeMaxLevel'),
             bounds: {
               x: bounds.minX,
               y: bounds.minY,
@@ -585,25 +584,24 @@
    * @return {sigma} Returns the instance itself.
    */
   sigma.prototype.render = function() {
-    var i,
-        l,
-        a,
+    var l,
+        i,
         prefix = 0;
 
     // Call each renderer:
-    a = Object.keys(this.renderers);
-    for (i = 0, l = a.length; i < l; i++)
+    for (i in this.renderers)
       if (this.settings('skipErrors'))
         try {
-          this.renderers[a[i]].render();
+          this.renderers[i].render();
         } catch (e) {
           if (this.settings('verbose'))
             console.log(
-              'Warning: The renderer "' + a[i] + '" crashed on ".render()"'
+              'Warning: The renderer "' + this.renderers[i] +
+              '" crashed on ".render()"'
             );
         }
       else
-        this.renderers[a[i]].render();
+        this.renderers[i].render();
 
     return this;
   };
@@ -634,7 +632,7 @@
           } catch (e) {
             if (this.settings('verbose'))
               console.log(
-                'Warning: The renderer "' + a[i].id + '" crashed on ".render()"'
+                'Warning: The renderer "'+ a[i].id + '" crashed on ".render()"'
               );
           }
         else
@@ -649,9 +647,7 @@
             } catch (e) {
               if (this.settings('verbose'))
                 console.log(
-                  'Warning: The renderer "' +
-                    a[i].id +
-                    '" crashed on ".render()"'
+                  'Warning: The renderer "'+a[i].id +'" crashed on ".render()"'
                 );
             }
           else
@@ -722,9 +718,13 @@
   /**
    * The current version of sigma:
    */
-  sigma.version = '1.2.0';
+  sigma.version = '1.5.2';
 
 
+  /**
+   * Disable ES6 features if true:
+   */
+  sigma.forceES5 = false;
 
 
   /**
@@ -1321,7 +1321,7 @@
   /**
    * Kills one or more jobs, indicated by their ids. It is only possible to
    * kill running jobs or waiting jobs. If you try to kill a job that does not
-   * exist or that is already killed, a warning will be thrown.
+   * exists or that is already killed, a warning will be thrown.
    *
    * @param  {Array|String} v1 A string job id or an array of job ids.
    * @return {Object}       Returns conrad.
@@ -1466,7 +1466,7 @@
   }
 
   /**
-   * Unreference every job that is stored in the _doneJobs object. It will
+   * Unreference every jobs that are stored in the _doneJobs object. It will
    * not be possible anymore to get stats about these jobs, but it will release
    * the memory.
    *
@@ -1758,6 +1758,121 @@ if (typeof exports !== 'undefined') {
   /**
    * MISC UTILS:
    */
+
+
+  /**
+   * SigmaMap wraps an ES6 Object. Methods set, get, has, forEach, delete, and clear
+   * have the same signature than the corresponding Map methods.
+   */
+  function SigmaMap() {
+    var self = this;
+    var _store;
+
+    if (!sigma.forceES5 &&
+      typeof Map !== 'undefined' &&
+      Map.prototype.keys !== undefined &&
+      Map.prototype.forEach !== undefined
+      && Array.from !== undefined) {
+
+      _store = new Map();
+
+      Object.defineProperty(this, 'size', {
+        get: function() { return _store.size; },
+        set: undefined,
+        enumerable: true
+      });
+
+      this.set = function(key, value) { _store.set('' + key, value); };
+      this.get = function(key) { return _store.get('' + key); };
+      this.has = function(key) { return _store.has('' + key); };
+      this.forEach = function(func) { return _store.forEach(func); };
+      this.delete = function(key) { return _store.delete('' + key); };
+      this.clear = function() { _store.clear(); };
+
+      this.keyList = function () {
+        return Array.from(_store.keys());
+      };
+
+      this.valueList = function () {
+        var values = [];
+        _store.forEach(function(val) {
+          values.push(val);
+        });
+        return values;
+      };
+    }
+    else {
+      _store = Object.create(null);
+      this.size = 0;
+
+      this.keyList = function () {
+        return Object.keys(_store).filter(function(key) {
+          return _store[key] !== undefined;
+        });
+      };
+
+      this.valueList = function () {
+        var keys = Object.keys(_store);
+        var values = [];
+
+        for (var i = 0; i < keys.length; i++) {
+          var val = _store[keys[i]];
+          if (val !== undefined) {
+            values.push(val);
+          }
+        }
+        return values;
+      };
+
+      this.set = function (key, value) {
+        if (_store[key] === undefined) self.size++;
+
+        _store[key] = value;
+      };
+
+      this.get = function (key) {
+        return _store[key];
+      };
+
+      this.has = function (key) {
+        return _store[key] !== undefined;
+      };
+
+      this.forEach = function (func) {
+        var keys = Object.keys(_store);
+        for (var i = 0; i < keys.length; ++i) {
+          var key = keys[i],
+              obj = _store[key];
+
+          if (typeof obj !== 'undefined') {
+            func(obj, key);
+          }
+        }
+      };
+
+      this.delete = function (key) {
+        var value = _store[key];
+        _store[key] = undefined;
+
+        if (value !== undefined) self.size--;
+
+        return value;
+      };
+
+      this.clear = function () {
+        for (var k in _store)
+          if (!('hasOwnProperty' in _store) || _store.hasOwnProperty(k))
+            delete _store[k];
+
+        _store = Object.create(null);
+        self.size = 0;
+      };
+    }
+  }
+
+  sigma.utils.map = SigmaMap;
+
+
   /**
    * This function takes any number of objects as arguments, copies from each
    * of these objects each pair key/value into a new object, and finally
@@ -1986,16 +2101,18 @@ if (typeof exports !== 'undefined') {
   /**
    * Return the control point coordinates for a quadratic bezier curve.
    *
-   * @param  {number} x1  The X coordinate of the start point.
-   * @param  {number} y1  The Y coordinate of the start point.
-   * @param  {number} x2  The X coordinate of the end point.
-   * @param  {number} y2  The Y coordinate of the end point.
-   * @return {x,y}        The control point coordinates.
+   * @param  {number}  x1  The X coordinate of the start point.
+   * @param  {number}  y1  The Y coordinate of the start point.
+   * @param  {number}  x2  The X coordinate of the end point.
+   * @param  {number}  y2  The Y coordinate of the end point.
+   * @param  {?number} cc  The curvature coefficients.
+   * @return {x,y}         The control point coordinates.
    */
-  sigma.utils.getQuadraticControlPoint = function(x1, y1, x2, y2) {
+  sigma.utils.getQuadraticControlPoint = function(x1, y1, x2, y2, cc) {
+    cc = this.extend(cc, { x: 2, y: 4 });
     return {
-      x: (x1 + x2) / 2 + (y2 - y1) / 4,
-      y: (y1 + y2) / 2 + (x1 - x2) / 4
+      x: (x1 + x2) / cc.x + (y2 - y1) / cc.y,
+      y: (y1 + y2) / cc.x + (x1 - x2) / cc.y
     };
   };
 
@@ -2016,8 +2133,8 @@ if (typeof exports !== 'undefined') {
   sigma.utils.getPointOnQuadraticCurve = function(t, x1, y1, x2, y2, xi, yi) {
     // http://stackoverflow.com/a/5634528
     return {
-      x: Math.pow(1 - t, 2) * x1 + 2 * (1 - t) * t * xi + Math.pow(t, 2) * x2,
-      y: Math.pow(1 - t, 2) * y1 + 2 * (1 - t) * t * yi + Math.pow(t, 2) * y2
+      x: (1 - t) * (1 - t) * x1 + 2 * (1 - t) * t * xi + t * t * x2,
+      y: (1 - t) * (1 - t) * y1 + 2 * (1 - t) * t * yi + t * t * y2
     };
   };
 
@@ -2041,10 +2158,10 @@ if (typeof exports !== 'undefined') {
     function(t, x1, y1, x2, y2, cx, cy, dx, dy) {
     // http://stackoverflow.com/a/15397596
     // Blending functions:
-    var B0_t = Math.pow(1 - t, 3),
-        B1_t = 3 * t * Math.pow(1 - t, 2),
-        B2_t = 3 * Math.pow(t, 2) * (1 - t),
-        B3_t = Math.pow(t, 3);
+    var B0_t = (1 - t) * (1 - t) * (1 - t),
+        B1_t = 3 * t * (1 - t) * (1 - t),
+        B2_t = 3 * t * t * (1 - t),
+        B3_t = t * t * t;
 
     return {
       x: (B0_t * x1) + (B1_t * cx) + (B2_t * dx) + (B3_t * x2),
@@ -2082,7 +2199,7 @@ if (typeof exports !== 'undefined') {
    * @return {number}     The euclidian distance.
    */
   sigma.utils.getDistance = function(x0, y0, x1, y1) {
-    return Math.sqrt(Math.pow(x1 - x0, 2) + Math.pow(y1 - y0, 2));
+    return Math.sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0));
   };
 
   /**
@@ -2163,14 +2280,50 @@ if (typeof exports !== 'undefined') {
     *                          segment, false otherwise.
   */
   sigma.utils.isPointOnSegment = function(x, y, x1, y1, x2, y2, epsilon) {
-    // http://stackoverflow.com/a/328122
-    var crossProduct = Math.abs((y - y1) * (x2 - x1) - (x - x1) * (y2 - y1)),
-        d = sigma.utils.getDistance(x1, y1, x2, y2),
-        nCrossProduct = crossProduct / d; // normalized cross product
+    return sigma.utils.distancePointToSegment(x, y, x1, y1, x2, y2) < epsilon;
+  };
 
-    return (nCrossProduct < epsilon &&
-     Math.min(x1, x2) <= x && x <= Math.max(x1, x2) &&
-     Math.min(y1, y2) <= y && y <= Math.max(y1, y2));
+  /**
+    * Compute the distance of a point to a line segment.
+    *
+    * @param  {number} x       The X coordinate of the point to check.
+    * @param  {number} y       The Y coordinate of the point to check.
+    * @param  {number} x1      The X coordinate of the line start point.
+    * @param  {number} y1      The Y coordinate of the line start point.
+    * @param  {number} x2      The X coordinate of the line end point.
+    * @param  {number} y2      The Y coordinate of the line end point.
+    * @return {number}         Distance to the segment
+  */
+  sigma.utils.distancePointToSegment = function(x, y, x1, y1, x2, y2) {
+    // http://stackoverflow.com/a/6853926/1075195
+    var A = x - x1,
+        B = y - y1,
+        C = x2 - x1,
+        D = y2 - y1,
+        dot = A * C + B * D,
+        len_sq = C * C + D * D,
+        param = -1,
+        xx, yy;
+
+    if (len_sq !== 0) //in case of 0 length line
+        param = dot / len_sq;
+
+    if (param < 0) {
+      xx = x1;
+      yy = y1;
+    }
+    else if (param > 1) {
+      xx = x2;
+      yy = y2;
+    }
+    else {
+      xx = x1 + param * C;
+      yy = y1 + param * D;
+    }
+
+    var dx = x - xx;
+    var dy = y - yy;
+    return Math.sqrt(dx * dx + dy * dy);
   };
 
   /**
@@ -2397,7 +2550,7 @@ if (typeof exports !== 'undefined') {
         sigma.utils.getPixelRatio();
     return {
       x: sigma.utils.getWidth(e) / (2 * ratio),
-      y: sigma.utils.getHeight(e) / (2 * ratio)
+      y: sigma.utils.getHeight(e) / (2 * ratio),
     };
   };
 
@@ -2573,6 +2726,27 @@ if (typeof exports !== 'undefined') {
    * WEBGL UTILS:
    * ************
    */
+
+  /**
+   * Return true if the browser support webgl
+   *
+   * @return {boolean}
+   */
+  sigma.utils.isWebGLSupported = function() {
+    var canvas,
+        webgl = !!window.WebGLRenderingContext;
+    if (webgl) {
+      canvas = document.createElement('canvas');
+      try {
+        return !!(
+          canvas.getContext('webgl') ||
+          canvas.getContext('experimental-webgl')
+        );
+      } catch (e) {}
+    }
+    return false;
+  };
+
   /**
    * Loads a WebGL shader and returns it.
    *
@@ -2651,9 +2825,6 @@ if (typeof exports !== 'undefined') {
 
     return program;
   };
-
-
-
 
   /**
    * *********
@@ -2765,6 +2936,191 @@ if (typeof exports !== 'undefined') {
       a20 * b02 + a21 * b12 + a22 * b22
     ];
   };
+
+
+  /**
+   * ************
+   * CANVAS UTILS:
+   * ************
+   */
+  /**
+   * Calculate the width of the text either approximated via the font size or
+   * via the more expensive but accurate context.measureText.
+   *
+   * @param  {CanvasRenderingContext2D} context  The canvas context.
+   * @param  {boolean}     approximate   Approximate or not.
+   * @param  {integer}     fontSize      Font size of the text.
+   * @param  {string}      text          The text to use.
+   *
+   * @return {float}       Returns the width.
+   */
+   sigma.utils.canvas = {};
+   sigma.utils.canvas.getTextWidth =
+        function(context, approximate, fontSize, text) {
+
+    if (!text) return 0;
+
+    return approximate ? 0.6 * text.length * fontSize :
+      context.measureText(text).width;
+  };
+
+  /**
+   * Set the shadow values of the specified context according to the level
+   * to create visual depth.
+   *
+   * @param  {number}     level     The level (from 1 to 5).
+   * @param  {CanvasRenderingContext2D} context  The canvas context.
+   */
+  sigma.utils.canvas.setLevel = function(level, context) {
+    if (level) {
+      context.shadowOffsetX = 0;
+      // inspired by Material Design shadows, level from 1 to 5:
+      switch(level) {
+        case 1:
+          context.shadowOffsetY = 1.5;
+          context.shadowBlur = 4;
+          context.shadowColor = 'rgba(0,0,0,0.36)';
+          break;
+        case 2:
+          context.shadowOffsetY = 3;
+          context.shadowBlur = 12;
+          context.shadowColor = 'rgba(0,0,0,0.39)';
+          break;
+        case 3:
+          context.shadowOffsetY = 6;
+          context.shadowBlur = 12;
+          context.shadowColor = 'rgba(0,0,0,0.42)';
+          break;
+        case 4:
+          context.shadowOffsetY = 10;
+          context.shadowBlur = 20;
+          context.shadowColor = 'rgba(0,0,0,0.47)';
+          break;
+        case 5:
+          context.shadowOffsetY = 15;
+          context.shadowBlur = 24;
+          context.shadowColor = 'rgba(0,0,0,0.52)';
+          break;
+      }
+    }
+  };
+
+  /**
+   * Reset the shadow values.
+   *
+   * @param  {CanvasRenderingContext2D} context  The canvas context.
+   */
+  sigma.utils.canvas.resetLevel = function(context) {
+    context.shadowOffsetY = 0;
+    context.shadowBlur = 0;
+    context.shadowColor = '#000000';
+  };
+
+  // incrementally scaled, not automatically resized for now
+  // (ie. possible memory leak if there are many graph load / unload)
+  var imgCache = {};
+
+  /**
+   * Draw an image inside the specified node on the canvas.
+   *
+   * @param  {object}                   node     The node object.
+   * @param  {number}                   x        The node x coordinate.
+   * @param  {number}                   y        The node y coordinate.
+   * @param  {number}                   size     The node size.
+   * @param  {CanvasRenderingContext2D} context  The canvas context.
+   * @param  {string}                   imgCrossOrigin Cross-origin URL or '*'.
+   * @param  {number}                  threshold Display if node size is larger
+   * @param  {function}                 clipFn    The clipping shape function.
+   */
+  sigma.utils.canvas.drawImage =
+    function(node, x, y, size, context, imgCrossOrigin, threshold, clipFn) {
+
+    if(!node.image || !node.image.url || size < threshold) return;
+
+    var url = node.image.url;
+    var ih = node.image.h || 1; // 1 is arbitrary, anyway only the ratio counts
+    var iw = node.image.w || 1;
+    var scale = node.image.scale || 1;
+    var clip = node.image.clip || 1;
+
+    // create new IMG or get from imgCache
+    var image = imgCache[url];
+    if(!image) {
+      image = document.createElement('IMG');
+      image.setAttribute('crossOrigin', imgCrossOrigin);
+      image.src = url;
+      image.onload = function() {
+        window.dispatchEvent(new Event('resize'));
+      };
+      imgCache[url] = image;
+    }
+
+    // calculate position and draw
+    var xratio = (iw < ih) ? (iw / ih) : 1;
+    var yratio = (ih < iw) ? (ih / iw) : 1;
+    var r = size * scale;
+
+    context.save(); // enter clipping mode
+      context.beginPath();
+    if (typeof clipFn === 'function') {
+      clipFn(node, x, y, size, context, clip);
+    }
+    else {
+      // Draw the clipping disc:
+      context.arc(x, y, size * clip, 0, Math. PI * 2, true);
+    }
+    context.closePath();
+    context.clip();
+
+    // Draw the actual image
+    context.drawImage(
+      image,
+      x + Math.sin(-3.142 / 4) * r * xratio,
+      y - Math.cos(-3.142 / 4) * r * yratio,
+      r * xratio * 2 * Math.sin(-3.142 / 4) * (-1),
+      r * yratio * 2 * Math.cos(-3.142 / 4)
+    );
+    context.restore(); // exit clipping mode
+  };
+
+  /**
+   * Draw an icon inside the specified node on the canvas.
+   *
+   * @param  {object}                   node     The node object.
+   * @param  {number}                   x        The node x coordinate.
+   * @param  {number}                   y        The node y coordinate.
+   * @param  {number}                   size     The node size.
+   * @param  {CanvasRenderingContext2D} context  The canvas context.
+   * @param  {number}                  threshold Display if node size is larger
+   */
+  sigma.utils.canvas.drawIcon = function(node, x, y, size, context, threshold){
+    if(!node.icon || size < threshold) return;
+
+    var font = node.icon.font || 'Arial',
+        fgColor = node.icon.color || '#F00',
+        text = node.icon.content || '?',
+        px = node.icon.x || 0.5,
+        py = node.icon.y || 0.5,
+        height = size,
+        width = size;
+
+    var fontSizeRatio = 0.70;
+    if (typeof node.icon.scale === "number") {
+      fontSizeRatio = Math.abs(Math.max(0.01, node.icon.scale));
+    }
+
+    var fontSize = Math.round(fontSizeRatio * height);
+
+    context.save();
+    context.fillStyle = fgColor;
+
+    context.font = '' + fontSize + 'px ' + font;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(text, x, y);
+    context.restore();
+  };
+
 }).call(this);
 
 ;(function(global) {
@@ -2861,7 +3217,7 @@ if (typeof exports !== 'undefined') {
      */
     // {boolean} Indicates if the data have to be cloned in methods to add
     //           nodes or edges.
-    clone: true,
+    clone: false,
     // {boolean} Indicates if nodes "id" values and edges "id", "source" and
     //           "target" values must be set as immutable.
     immutable: true,
@@ -2887,6 +3243,9 @@ if (typeof exports !== 'undefined') {
     defaultNodeColor: '#000',
     // {string}
     defaultLabelSize: 14,
+    // {string} Label position relative to its node. Available values:
+    //          "right", "left", "top", "bottom", "center", "inside"
+    labelAlignment: 'right',
     // {string} Indicates how to choose the edges color. Available values:
     //          "source", "target", "default"
     edgeColor: 'source',
@@ -2906,11 +3265,14 @@ if (typeof exports !== 'undefined') {
     labelSizeRatio: 1,
     // {number} The minimum size a node must have to see its label displayed.
     labelThreshold: 8,
+    // {number} Maximum length of a node's label (in characters). Displays the label on several lines. 0 disables it
+    // (the whole label is displayed on one line)
+    maxNodeLabelLineLength: 0,
     // {number} The oversampling factor used in WebGL renderer.
     webglOversamplingRatio: 2,
-    // {number} The size of the border of hovered nodes.
-    borderSize: 0,
-    // {number} The default hovered node border's color.
+    // {number} The size of the border of nodes.
+    nodeBorderSize: 0,
+    // {number} The default node border's color.
     defaultNodeBorderColor: '#000',
     // {number} The hovered node's label font. If not specified, will heritate
     //          the "font" value.
@@ -2966,8 +3328,17 @@ if (typeof exports !== 'undefined') {
     //           several frames.
     canvasEdgesBatchSize: 500,
     webglEdgesBatchSize: 1000,
-
-
+    // {boolean} Approximate labels width instead of using canvas.measureText
+    approximateLabelWidth: true,
+    // {boolean} Hide edges from nodes too far away
+    edgesClippingWithNodes: true,
+    // {number} if sigma.canvas.edges.autoCurve is called, set relative
+    // distance between curved parallel edges (i.e. edges with same
+    // extremities). Smaller value increases distances.
+    autoCurveRatio: 1,
+    // {boolean} if sigma.canvas.edges.autoCurve is called, sort edges by
+    // direction.
+    autoCurveSortByDirection: true,
 
 
     /**
@@ -2998,6 +3369,9 @@ if (typeof exports !== 'undefined') {
      * CAPTORS SETTINGS:
      * *****************
      */
+    // {boolean} If true, the user will need to click on the visualization element
+    // in order to focus it
+    clickToFocus: false,
     // {boolean}
     touchEnabled: true,
     // {boolean}
@@ -3019,6 +3393,8 @@ if (typeof exports !== 'undefined') {
     zoomMin: 0.0625,
     // {number} The maximum zooming level.
     zoomMax: 2,
+    // {boolean} Defines whether the zoom focuses on the mouse location.
+    zoomOnLocation: true,
     // {number} The duration of animations following a mouse scrolling.
     mouseZoomDuration: 200,
     // {number} The duration of animations following a mouse double click.
@@ -3045,10 +3421,6 @@ if (typeof exports !== 'undefined') {
      * GLOBAL SETTINGS:
      * ****************
      */
-    // {boolean} Determines whether the instance has to refresh itself
-    //           automatically when a "resize" event is dispatched from the
-    //           window object.
-    autoResize: true,
     // {boolean} Determines whether the "rescale" middleware has to be called
     //           automatically for each camera on refresh.
     autoRescale: true,
@@ -3068,6 +3440,16 @@ if (typeof exports !== 'undefined') {
     //           rendering.
     skipErrors: false,
 
+
+
+    /**
+     * SPATIAL INDEXING SETTINGS:
+     * ****************
+     */
+    // {number} Max height of the node quad tree.
+    nodeQuadtreeMaxLevel: 4,
+    // {number} Max height of the edge quad tree.
+    edgeQuadtreeMaxLevel: 4,
 
 
 
@@ -3484,8 +3866,8 @@ if (typeof exports !== 'undefined') {
        * ***************
        * These indexes just index data by ids.
        */
-      nodesIndex: Object.create(null),
-      edgesIndex: Object.create(null),
+      nodesIndex: new sigma.utils.map(),
+      edgesIndex: new sigma.utils.map(),
 
       /**
        * LOCAL INDEXES:
@@ -3493,13 +3875,9 @@ if (typeof exports !== 'undefined') {
        * These indexes refer from node to nodes. Each key is an id, and each
        * value is the array of the ids of related nodes.
        */
-      inNeighborsIndex: Object.create(null),
-      outNeighborsIndex: Object.create(null),
-      allNeighborsIndex: Object.create(null),
-
-      inNeighborsCount: Object.create(null),
-      outNeighborsCount: Object.create(null),
-      allNeighborsCount: Object.create(null)
+      inNeighborsIndex: new sigma.utils.map(),
+      outNeighborsIndex: new sigma.utils.map(),
+      allNeighborsIndex: new sigma.utils.map()
     };
 
     // Execute bindings:
@@ -3798,7 +4176,7 @@ if (typeof exports !== 'undefined') {
     if (typeof node.id !== 'string' && typeof node.id !== 'number')
       throw 'The node must have a string or number id.';
 
-    if (this.nodesIndex[node.id])
+    if (this.nodesIndex.get(node.id))
       throw 'The node "' + node.id + '" already exists.';
 
     var k,
@@ -3813,6 +4191,22 @@ if (typeof exports !== 'undefined') {
     } else
       validNode = node;
 
+    // Try to fix the node coordinates and size
+    if (validNode.x !== undefined && typeof validNode.x !== 'number') {
+      validNode.x = parseFloat(validNode.x);
+    }
+    if (validNode.y !== undefined && typeof validNode.y !== 'number') {
+      validNode.y = parseFloat(validNode.y);
+    }
+    if (validNode.size !== undefined && typeof validNode.size !== 'number') {
+      validNode.size = parseFloat(validNode.size);
+    }
+
+    // Check node size
+    if (!validNode.size || validNode.size <= 0) {
+      validNode.size = 1;
+    }
+
     // Check the "immutable" option:
     if (this.settings('immutable'))
       Object.defineProperty(validNode, 'id', {
@@ -3823,17 +4217,13 @@ if (typeof exports !== 'undefined') {
       validNode.id = id;
 
     // Add empty containers for edges indexes:
-    this.inNeighborsIndex[id] = Object.create(null);
-    this.outNeighborsIndex[id] = Object.create(null);
-    this.allNeighborsIndex[id] = Object.create(null);
-
-    this.inNeighborsCount[id] = 0;
-    this.outNeighborsCount[id] = 0;
-    this.allNeighborsCount[id] = 0;
+    this.inNeighborsIndex.set(id, new sigma.utils.map());
+    this.outNeighborsIndex.set(id, new sigma.utils.map());
+    this.allNeighborsIndex.set(id, new sigma.utils.map());
 
     // Add the node to indexes:
     this.nodesArray.push(validNode);
-    this.nodesIndex[validNode.id] = validNode;
+    this.nodesIndex.set(validNode.id, validNode);
 
     // Return the current instance:
     return this;
@@ -3862,14 +4252,14 @@ if (typeof exports !== 'undefined') {
       throw 'The edge must have a string or number id.';
 
     if ((typeof edge.source !== 'string' && typeof edge.source !== 'number') ||
-        !this.nodesIndex[edge.source])
+        !this.nodesIndex.get(edge.source))
       throw 'The edge source must have an existing node id.';
 
     if ((typeof edge.target !== 'string' && typeof edge.target !== 'number') ||
-        !this.nodesIndex[edge.target])
+        !this.nodesIndex.get(edge.target))
       throw 'The edge target must have an existing node id.';
 
-    if (this.edgesIndex[edge.id])
+    if (this.edgesIndex.get(edge.id))
       throw 'The edge "' + edge.id + '" already exists.';
 
     var k,
@@ -3882,6 +4272,16 @@ if (typeof exports !== 'undefined') {
           validEdge[k] = edge[k];
     } else
       validEdge = edge;
+
+    // Try to fix the edge size
+    if (validEdge.size !== undefined && typeof validEdge.size !== 'number') {
+      validEdge.size = parseFloat(validEdge.size);
+    }
+
+    // Check edge size
+    if (!validEdge.size || validEdge.size <= 0) {
+      validEdge.size = 1;
+    }
 
     // Check the "immutable" option:
     if (this.settings('immutable')) {
@@ -3907,39 +4307,33 @@ if (typeof exports !== 'undefined') {
 
     // Add the edge to indexes:
     this.edgesArray.push(validEdge);
-    this.edgesIndex[validEdge.id] = validEdge;
+    this.edgesIndex.set(validEdge.id, validEdge);
 
-    if (!this.inNeighborsIndex[validEdge.target][validEdge.source])
-      this.inNeighborsIndex[validEdge.target][validEdge.source] =
-        Object.create(null);
-    this.inNeighborsIndex[validEdge.target][validEdge.source][validEdge.id] =
-      validEdge;
+    if (!this.inNeighborsIndex.get(validEdge.target).get(validEdge.source))
+      this.inNeighborsIndex.get(validEdge.target).set(validEdge.source,
+        new sigma.utils.map());
+    this.inNeighborsIndex.get(validEdge.target).get(validEdge.source).set(validEdge.id,
+      validEdge);
 
-    if (!this.outNeighborsIndex[validEdge.source][validEdge.target])
-      this.outNeighborsIndex[validEdge.source][validEdge.target] =
-        Object.create(null);
-    this.outNeighborsIndex[validEdge.source][validEdge.target][validEdge.id] =
-      validEdge;
+    if (!this.outNeighborsIndex.get(validEdge.source).get(validEdge.target))
+      this.outNeighborsIndex.get(validEdge.source).set(validEdge.target,
+        new sigma.utils.map());
+    this.outNeighborsIndex.get(validEdge.source).get(validEdge.target).set(validEdge.id,
+      validEdge);
 
-    if (!this.allNeighborsIndex[validEdge.source][validEdge.target])
-      this.allNeighborsIndex[validEdge.source][validEdge.target] =
-        Object.create(null);
-    this.allNeighborsIndex[validEdge.source][validEdge.target][validEdge.id] =
-      validEdge;
+    if (!this.allNeighborsIndex.get(validEdge.source).get(validEdge.target))
+      this.allNeighborsIndex.get(validEdge.source).set(validEdge.target,
+        new sigma.utils.map());
+    this.allNeighborsIndex.get(validEdge.source).get(validEdge.target).set(validEdge.id,
+      validEdge);
 
     if (validEdge.target !== validEdge.source) {
-      if (!this.allNeighborsIndex[validEdge.target][validEdge.source])
-        this.allNeighborsIndex[validEdge.target][validEdge.source] =
-          Object.create(null);
-      this.allNeighborsIndex[validEdge.target][validEdge.source][validEdge.id] =
-        validEdge;
+      if (!this.allNeighborsIndex.get(validEdge.target).get(validEdge.source))
+        this.allNeighborsIndex.get(validEdge.target).set(validEdge.source,
+          new sigma.utils.map());
+      this.allNeighborsIndex.get(validEdge.target).get(validEdge.source).set(validEdge.id,
+        validEdge);
     }
-
-    // Keep counts up to date:
-    this.inNeighborsCount[validEdge.target]++;
-    this.outNeighborsCount[validEdge.source]++;
-    this.allNeighborsCount[validEdge.target]++;
-    this.allNeighborsCount[validEdge.source]++;
 
     return this;
   });
@@ -3958,13 +4352,13 @@ if (typeof exports !== 'undefined') {
         arguments.length !== 1)
       throw 'dropNode: Wrong arguments.';
 
-    if (!this.nodesIndex[id])
+    if (!this.nodesIndex.get(id))
       throw 'The node "' + id + '" does not exist.';
 
     var i, k, l;
 
     // Remove the node from indexes:
-    delete this.nodesIndex[id];
+    this.nodesIndex.delete(id);
     for (i = 0, l = this.nodesArray.length; i < l; i++)
       if (this.nodesArray[i].id === id) {
         this.nodesArray.splice(i, 1);
@@ -3977,19 +4371,16 @@ if (typeof exports !== 'undefined') {
         this.dropEdge(this.edgesArray[i].id);
 
     // Remove related edge indexes:
-    delete this.inNeighborsIndex[id];
-    delete this.outNeighborsIndex[id];
-    delete this.allNeighborsIndex[id];
+    this.inNeighborsIndex.delete(id);
+    this.outNeighborsIndex.delete(id);
+    this.allNeighborsIndex.delete(id);
 
-    delete this.inNeighborsCount[id];
-    delete this.outNeighborsCount[id];
-    delete this.allNeighborsCount[id];
-
-    for (k in this.nodesIndex) {
-      delete this.inNeighborsIndex[k][id];
-      delete this.outNeighborsIndex[k][id];
-      delete this.allNeighborsIndex[k][id];
-    }
+    var self = this;
+    this.nodesIndex.forEach(function(n, k) {
+      self.inNeighborsIndex.get(k).delete(id);
+      self.outNeighborsIndex.get(k).delete(id);
+      self.allNeighborsIndex.get(k).delete(id);
+    });
 
     return this;
   });
@@ -4007,42 +4398,37 @@ if (typeof exports !== 'undefined') {
         arguments.length !== 1)
       throw 'dropEdge: Wrong arguments.';
 
-    if (!this.edgesIndex[id])
+    if (!this.edgesIndex.get(id))
       throw 'The edge "' + id + '" does not exist.';
 
     var i, l, edge;
 
     // Remove the edge from indexes:
-    edge = this.edgesIndex[id];
-    delete this.edgesIndex[id];
+    edge = this.edgesIndex.get(id);
+    this.edgesIndex.delete(id);
     for (i = 0, l = this.edgesArray.length; i < l; i++)
       if (this.edgesArray[i].id === id) {
         this.edgesArray.splice(i, 1);
         break;
       }
 
-    delete this.inNeighborsIndex[edge.target][edge.source][edge.id];
-    if (!Object.keys(this.inNeighborsIndex[edge.target][edge.source]).length)
-      delete this.inNeighborsIndex[edge.target][edge.source];
+    this.inNeighborsIndex.get(edge.target).get(edge.source).delete(edge.id);
+    if (this.inNeighborsIndex.get(edge.target).get(edge.source).size == 0)
+      this.inNeighborsIndex.get(edge.target).delete(edge.source);
 
-    delete this.outNeighborsIndex[edge.source][edge.target][edge.id];
-    if (!Object.keys(this.outNeighborsIndex[edge.source][edge.target]).length)
-      delete this.outNeighborsIndex[edge.source][edge.target];
+    this.outNeighborsIndex.get(edge.source).get(edge.target).delete(edge.id);
+    if (this.outNeighborsIndex.get(edge.source).get(edge.target).size == 0)
+      this.outNeighborsIndex.get(edge.source).delete(edge.target);
 
-    delete this.allNeighborsIndex[edge.source][edge.target][edge.id];
-    if (!Object.keys(this.allNeighborsIndex[edge.source][edge.target]).length)
-      delete this.allNeighborsIndex[edge.source][edge.target];
+    this.allNeighborsIndex.get(edge.source).get(edge.target).delete(edge.id);
+    if (this.allNeighborsIndex.get(edge.source).get(edge.target).size == 0)
+      this.allNeighborsIndex.get(edge.source).delete(edge.target);
 
     if (edge.target !== edge.source) {
-      delete this.allNeighborsIndex[edge.target][edge.source][edge.id];
-      if (!Object.keys(this.allNeighborsIndex[edge.target][edge.source]).length)
-        delete this.allNeighborsIndex[edge.target][edge.source];
+      this.allNeighborsIndex.get(edge.target).get(edge.source).delete(edge.id);
+      if (this.allNeighborsIndex.get(edge.target).get(edge.source).size == 0)
+        this.allNeighborsIndex.get(edge.target).delete(edge.source);
     }
-
-    this.inNeighborsCount[edge.target]--;
-    this.outNeighborsCount[edge.source]--;
-    this.allNeighborsCount[edge.source]--;
-    this.allNeighborsCount[edge.target]--;
 
     return this;
   });
@@ -4064,9 +4450,6 @@ if (typeof exports !== 'undefined') {
     delete this.inNeighborsIndex;
     delete this.outNeighborsIndex;
     delete this.allNeighborsIndex;
-    delete this.inNeighborsCount;
-    delete this.outNeighborsCount;
-    delete this.allNeighborsCount;
   });
 
   /**
@@ -4082,15 +4465,12 @@ if (typeof exports !== 'undefined') {
     // Due to GC issues, I prefer not to create new object. These objects are
     // only available from the methods and attached functions, but still, it is
     // better to prevent ghost references to unrelevant data...
-    __emptyObject(this.nodesIndex);
-    __emptyObject(this.edgesIndex);
-    __emptyObject(this.nodesIndex);
-    __emptyObject(this.inNeighborsIndex);
-    __emptyObject(this.outNeighborsIndex);
-    __emptyObject(this.allNeighborsIndex);
-    __emptyObject(this.inNeighborsCount);
-    __emptyObject(this.outNeighborsCount);
-    __emptyObject(this.allNeighborsCount);
+    this.nodesIndex.clear();
+    this.edgesIndex.clear();
+    this.nodesIndex.clear();
+    this.inNeighborsIndex.clear();
+    this.outNeighborsIndex.clear();
+    this.allNeighborsIndex.clear();
 
     return this;
   });
@@ -4159,7 +4539,7 @@ if (typeof exports !== 'undefined') {
     // Return the related node:
     if (arguments.length === 1 &&
         (typeof v === 'string' || typeof v === 'number'))
-      return this.nodesIndex[v];
+      return this.nodesIndex.get(v);
 
     // Return an array of the related node:
     if (
@@ -4172,7 +4552,7 @@ if (typeof exports !== 'undefined') {
 
       for (i = 0, l = v.length; i < l; i++)
         if (typeof v[i] === 'string' || typeof v[i] === 'number')
-          a.push(this.nodesIndex[v[i]]);
+          a.push(this.nodesIndex.get(v[i]));
         else
           throw 'nodes: Wrong arguments.';
 
@@ -4195,13 +4575,13 @@ if (typeof exports !== 'undefined') {
   graph.addMethod('degree', function(v, which) {
     // Check which degree is required:
     which = {
-      'in': this.inNeighborsCount,
-      'out': this.outNeighborsCount
-    }[which || ''] || this.allNeighborsCount;
+      'in': this.inNeighborsIndex,
+      'out': this.outNeighborsIndex
+    }[which || ''] || this.allNeighborsIndex;
 
     // Return the related node:
     if (typeof v === 'string' || typeof v === 'number')
-      return which[v];
+      return which.get(v).size;
 
     // Return an array of the related node:
     if (Object.prototype.toString.call(v) === '[object Array]') {
@@ -4211,7 +4591,7 @@ if (typeof exports !== 'undefined') {
 
       for (i = 0, l = v.length; i < l; i++)
         if (typeof v[i] === 'string' || typeof v[i] === 'number')
-          a.push(which[v[i]]);
+          a.push(which.get(v[i]).size);
         else
           throw 'degree: Wrong arguments.';
 
@@ -4240,7 +4620,7 @@ if (typeof exports !== 'undefined') {
     // Return the related edge:
     if (arguments.length === 1 &&
         (typeof v === 'string' || typeof v === 'number'))
-      return this.edgesIndex[v];
+      return this.edgesIndex.get(v);
 
     // Return an array of the related edge:
     if (
@@ -4253,7 +4633,7 @@ if (typeof exports !== 'undefined') {
 
       for (i = 0, l = v.length; i < l; i++)
         if (typeof v[i] === 'string' || typeof v[i] === 'number')
-          a.push(this.edgesIndex[v[i]]);
+          a.push(this.edgesIndex.get(v[i]));
         else
           throw 'edges: Wrong arguments.';
 
@@ -4335,7 +4715,8 @@ if (typeof exports !== 'undefined') {
     var i,
         l,
         c = coordinates || {},
-        keys = ['x', 'y', 'ratio', 'angle'];
+        keys = ('ratio' in coordinates && !this.settings('zoomOnLocation'))
+          ? ['ratio', 'angle'] : ['x', 'y', 'ratio', 'angle'];
 
     for (i = 0, l = keys.length; i < l; i++)
       if (c[keys[i]] !== undefined) {
@@ -4527,8 +4908,7 @@ if (typeof exports !== 'undefined') {
    * Sigma Quadtree Module
    * =====================
    *
-   * Author: Guillaume Plique (Yomguithereal)
-   * Version: 0.2
+   * Author: Guillaume Plique (Yomguithereal), Sébastien Heymann, Damien Marié
    */
 
 
@@ -4556,6 +4936,121 @@ if (typeof exports !== 'undefined') {
         x2: n.x + n.size,
         y2: n.y - n.size,
         height: n.size * 2
+      };
+    },
+
+
+    /**
+     * Transforms a graph edge with x1, y1, x2, y2 and size into an
+     * axis-aligned square.
+     *
+     * @param  {object} A graph edge with at least two points
+     *                  (x1, y1), (x2, y2) and a size.
+     * @return {object} A square: two points (x1, y1), (x2, y2) and height.
+     */
+    lineToSquare: function(e) {
+      if (e.y1 < e.y2) {
+        // (e.x1, e.y1) on top
+        if (e.x1 < e.x2) {
+          // (e.x1, e.y1) on left
+          return {
+            x1: e.x1 - e.size,
+            y1: e.y1 - e.size,
+            x2: e.x2 + e.size,
+            y2: e.y1 - e.size,
+            height: e.y2 - e.y1 + e.size * 2
+          };
+        }
+        // (e.x1, e.y1) on right
+        return {
+          x1: e.x2 - e.size,
+          y1: e.y1 - e.size,
+          x2: e.x1 + e.size,
+          y2: e.y1 - e.size,
+          height: e.y2 - e.y1 + e.size * 2
+        };
+      }
+
+      // (e.x2, e.y2) on top
+      if (e.x1 < e.x2) {
+        // (e.x1, e.y1) on left
+        return {
+          x1: e.x1 - e.size,
+          y1: e.y2 - e.size,
+          x2: e.x2 + e.size,
+          y2: e.y2 - e.size,
+          height: e.y1 - e.y2 + e.size * 2
+        };
+      }
+      // (e.x2, e.y2) on right
+      return {
+        x1: e.x2 - e.size,
+        y1: e.y2 - e.size,
+        x2: e.x1 + e.size,
+        y2: e.y2 - e.size,
+        height: e.y1 - e.y2 + e.size * 2
+      };
+    },
+
+    /**
+     * Transforms a graph edge of type 'curve' with x1, y1, x2, y2,
+     * control point and size into an axis-aligned square.
+     *
+     * @param  {object} e  A graph edge with at least two points
+     *                     (x1, y1), (x2, y2) and a size.
+     * @param  {object} cp A control point (x,y).
+     * @return {object}    A square: two points (x1, y1), (x2, y2) and height.
+     */
+    quadraticCurveToSquare: function(e, cp) {
+      var pt = sigma.utils.getPointOnQuadraticCurve(
+        0.5,
+        e.x1,
+        e.y1,
+        e.x2,
+        e.y2,
+        cp.x,
+        cp.y
+      );
+
+      // Bounding box of the two points and the point at the middle of the
+      // curve:
+      var minX = Math.min(e.x1, e.x2, pt.x),
+          maxX = Math.max(e.x1, e.x2, pt.x),
+          minY = Math.min(e.y1, e.y2, pt.y),
+          maxY = Math.max(e.y1, e.y2, pt.y);
+
+      return {
+        x1: minX - e.size,
+        y1: minY - e.size,
+        x2: maxX + e.size,
+        y2: minY - e.size,
+        height: maxY - minY + e.size * 2
+      };
+    },
+
+    /**
+     * Transforms a graph self loop into an axis-aligned square.
+     *
+     * @param  {object} n A graph node with a point (x, y) and a size.
+     * @return {object}   A square: two points (x1, y1), (x2, y2) and height.
+     */
+    selfLoopToSquare: function(n) {
+      // Fitting to the curve is too costly, we compute a larger bounding box
+      // using the control points:
+      var cp = sigma.utils.getSelfLoopControlPoints(n.x, n.y, n.size);
+
+      // Bounding box of the point and the two control points:
+      var minX = Math.min(n.x, cp.x1, cp.x2),
+          maxX = Math.max(n.x, cp.x1, cp.x2),
+          minY = Math.min(n.y, cp.y1, cp.y2),
+          maxY = Math.max(n.y, cp.y1, cp.y2);
+
+      return {
+        x1: minX - n.size,
+        y1: minY - n.size,
+        x2: maxX + n.size,
+        y2: minY - n.size,
+        height: maxY - minY + n.size * 2
       };
     },
 
@@ -4618,8 +5113,8 @@ if (typeof exports !== 'undefined') {
     lowerLeftCoor: function(r) {
       var width = (
         Math.sqrt(
-          Math.pow(r.x2 - r.x1, 2) +
-          Math.pow(r.y2 - r.y1, 2)
+          (r.x2 - r.x1) * (r.x2 - r.x1) +
+          (r.y2 - r.y1) * (r.y2 - r.y1)
         )
       );
 
@@ -4725,7 +5220,7 @@ if (typeof exports !== 'undefined') {
     projection: function(c, a) {
       var l = (
         (c.x * a.x + c.y * a.y) /
-        (Math.pow(a.x, 2) + Math.pow(a.y, 2))
+        (a.x * a.x + a.y * a.y)
       );
 
       return {
@@ -5045,26 +5540,30 @@ if (typeof exports !== 'undefined') {
   /**
    * The quad core that will become the sigma interface with the quadtree.
    *
-   * property {object} _tree  Property holding the quadtree object.
-   * property {object} _geom  Exposition of the _geom namespace for testing.
-   * property {object} _cache Cache for the area method.
+   * @param  {boolean?} indexEdges Tell to index edges or nodes
+   *
+   * property {object} _tree       Property holding the quadtree object
+   * property {object} _geom       Exposition of the _geom namespace for testing
+   * property {object} _cache      Cache for the area method
    */
-  var quad = function() {
+  var quad = function(indexEdges) {
     this._geom = _geom;
     this._tree = null;
     this._cache = {
       query: false,
       result: false
     };
+    this._enabled = true;
+    this._indexEdges = indexEdges || false;
   };
 
   /**
-   * Index a graph by inserting its nodes into the quadtree.
+   * Index a graph by inserting its elements into the quadtree.
    *
-   * @param  {array}  nodes   An array of nodes to index.
-   * @param  {object} params  An object of parameters with at least the quad
-   *                          bounds.
-   * @return {object}         The quadtree object.
+   * @param  {array}  graph      The graph to index
+   * @param  {object} params     An object of parameters with at least the quad
+   *                             bounds.
+   * @return {object}            The quadtree object.
    *
    * Parameters:
    * ----------
@@ -5074,14 +5573,25 @@ if (typeof exports !== 'undefined') {
    * maxElements: {integer?} the max number of elements in a leaf node.
    * maxLevel:    {integer?} the max recursion level of the tree.
    */
-  quad.prototype.index = function(nodes, params) {
+  quad.prototype.index = function(graph, params) {
+    if (!this._enabled) {
+      return this._tree;
+    }
 
     // Enforcing presence of boundaries
     if (!params.bounds)
       throw 'sigma.classes.quad.index: bounds information not given.';
 
     // Prefix
-    var prefix = params.prefix || '';
+    var prefix = params.prefix || '',
+        cp,
+        cc = params.curvatureCoefficients,
+        source,
+        target,
+        i,
+        l,
+        n,
+        e;
 
     // Building the tree
     this._tree = _quadTree(
@@ -5091,19 +5601,64 @@ if (typeof exports !== 'undefined') {
       params.maxLevel
     );
 
-    // Inserting graph nodes into the tree
-    for (var i = 0, l = nodes.length; i < l; i++) {
+    if (!this._indexEdges) {
+      var nodes = graph.nodes();
+      // Inserting graph nodes into the tree
+      for (i = 0, l = nodes.length; i < l; i++) {
 
-      // Inserting node
-      _quadInsert(
-        nodes[i],
-        _geom.pointToSquare({
-          x: nodes[i][prefix + 'x'],
-          y: nodes[i][prefix + 'y'],
-          size: nodes[i][prefix + 'size']
-        }),
-        this._tree
-      );
+        // Inserting node
+        _quadInsert(
+          nodes[i],
+          _geom.pointToSquare({
+            x: nodes[i][prefix + 'x'],
+            y: nodes[i][prefix + 'y'],
+            size: nodes[i][prefix + 'size']
+          }),
+          this._tree
+        );
+      }
+    } else {
+      var edges = graph.edges();
+      // Inserting graph edges into the tree
+      for (i = 0, l = edges.length; i < l; i++) {
+        source = graph.nodes(edges[i].source);
+        target = graph.nodes(edges[i].target);
+        e = {
+          x1: source[prefix + 'x'],
+          y1: source[prefix + 'y'],
+          x2: target[prefix + 'x'],
+          y2: target[prefix + 'y'],
+          size: edges[i][prefix + 'size'] || 0
+        };
+
+        // Inserting edge
+        if (edges[i].type === 'curve' || edges[i].type === 'curvedArrow') {
+          if (source.id === target.id) {
+            n = {
+              x: source[prefix + 'x'],
+              y: source[prefix + 'y'],
+              size: source[prefix + 'size'] || 0
+            };
+            _quadInsert(
+              edges[i],
+              _geom.selfLoopToSquare(n),
+              this._tree);
+          }
+          else {
+            cp = sigma.utils.getQuadraticControlPoint(e.x1, e.y1, e.x2, e.y2, edges[i].cc || cc);
+            _quadInsert(
+              edges[i],
+              _geom.quadraticCurveToSquare(e, cp),
+              this._tree);
+          }
+        }
+        else {
+          _quadInsert(
+            edges[i],
+            _geom.lineToSquare(e),
+            this._tree);
+        }
+      }
     }
 
     // Reset cache:
@@ -5125,6 +5680,9 @@ if (typeof exports !== 'undefined') {
    * @return {array}  An array of nodes retrieved.
    */
   quad.prototype.point = function(x, y) {
+    if (!this._enabled)
+      return [];
+
     return this._tree ?
       _quadRetrievePoint({x: x, y: y}, this._tree) || [] :
       [];
@@ -5140,6 +5698,9 @@ if (typeof exports !== 'undefined') {
    * @return {array}  An array of nodes retrieved.
    */
   quad.prototype.area = function(rect) {
+    if (!this._enabled)
+      return [];
+
     var serialized = JSON.stringify(rect),
         collisionFunc,
         rectData;
@@ -5159,7 +5720,7 @@ if (typeof exports !== 'undefined') {
     }
 
     // Retrieving nodes
-    var nodes = this._tree ?
+    var elements = this._tree ?
       _quadRetrieveArea(
         rectData,
         this._tree,
@@ -5168,15 +5729,15 @@ if (typeof exports !== 'undefined') {
       [];
 
     // Object to array
-    var nodesArray = [];
-    for (var i in nodes)
-      nodesArray.push(nodes[i]);
+    var elementsArr = [];
+    for (var i in elements)
+      elementsArr.push(elements[i]);
 
     // Caching
     this._cache.query = serialized;
-    this._cache.result = nodesArray;
+    this._cache.result = elementsArr;
 
-    return nodesArray;
+    return elementsArr;
   };
 
 
@@ -5187,845 +5748,14 @@ if (typeof exports !== 'undefined') {
   if (typeof this.sigma !== 'undefined') {
     this.sigma.classes = this.sigma.classes || {};
     this.sigma.classes.quad = quad;
+    this.sigma.classes.edgequad = quad.bind(this, true);
   } else if (typeof exports !== 'undefined') {
     if (typeof module !== 'undefined' && module.exports)
       exports = module.exports = quad;
     exports.quad = quad;
   } else
     this.quad = quad;
-}).call(this);
 
-;(function(undefined) {
-  'use strict';
-
-  /**
-   * Sigma Quadtree Module for edges
-   * ===============================
-   *
-   * Author: Sébastien Heymann,
-   *   from the quad of Guillaume Plique (Yomguithereal)
-   * Version: 0.2
-   */
-
-
-
-  /**
-   * Quad Geometric Operations
-   * -------------------------
-   *
-   * A useful batch of geometric operations used by the quadtree.
-   */
-
-  var _geom = {
-
-    /**
-     * Transforms a graph node with x, y and size into an
-     * axis-aligned square.
-     *
-     * @param  {object} A graph node with at least a point (x, y) and a size.
-     * @return {object} A square: two points (x1, y1), (x2, y2) and height.
-     */
-    pointToSquare: function(n) {
-      return {
-        x1: n.x - n.size,
-        y1: n.y - n.size,
-        x2: n.x + n.size,
-        y2: n.y - n.size,
-        height: n.size * 2
-      };
-    },
-
-    /**
-     * Transforms a graph edge with x1, y1, x2, y2 and size into an
-     * axis-aligned square.
-     *
-     * @param  {object} A graph edge with at least two points
-     *                  (x1, y1), (x2, y2) and a size.
-     * @return {object} A square: two points (x1, y1), (x2, y2) and height.
-     */
-    lineToSquare: function(e) {
-      if (e.y1 < e.y2) {
-        // (e.x1, e.y1) on top
-        if (e.x1 < e.x2) {
-          // (e.x1, e.y1) on left
-          return {
-            x1: e.x1 - e.size,
-            y1: e.y1 - e.size,
-            x2: e.x2 + e.size,
-            y2: e.y1 - e.size,
-            height: e.y2 - e.y1 + e.size * 2
-          };
-        }
-        // (e.x1, e.y1) on right
-        return {
-          x1: e.x2 - e.size,
-          y1: e.y1 - e.size,
-          x2: e.x1 + e.size,
-          y2: e.y1 - e.size,
-          height: e.y2 - e.y1 + e.size * 2
-        };
-      }
-
-      // (e.x2, e.y2) on top
-      if (e.x1 < e.x2) {
-        // (e.x1, e.y1) on left
-        return {
-          x1: e.x1 - e.size,
-          y1: e.y2 - e.size,
-          x2: e.x2 + e.size,
-          y2: e.y2 - e.size,
-          height: e.y1 - e.y2 + e.size * 2
-        };
-      }
-      // (e.x2, e.y2) on right
-      return {
-        x1: e.x2 - e.size,
-        y1: e.y2 - e.size,
-        x2: e.x1 + e.size,
-        y2: e.y2 - e.size,
-        height: e.y1 - e.y2 + e.size * 2
-      };
-    },
-
-    /**
-     * Transforms a graph edge of type 'curve' with x1, y1, x2, y2,
-     * control point and size into an axis-aligned square.
-     *
-     * @param  {object} e  A graph edge with at least two points
-     *                     (x1, y1), (x2, y2) and a size.
-     * @param  {object} cp A control point (x,y).
-     * @return {object}    A square: two points (x1, y1), (x2, y2) and height.
-     */
-    quadraticCurveToSquare: function(e, cp) {
-      var pt = sigma.utils.getPointOnQuadraticCurve(
-        0.5,
-        e.x1,
-        e.y1,
-        e.x2,
-        e.y2,
-        cp.x,
-        cp.y
-      );
-
-      // Bounding box of the two points and the point at the middle of the
-      // curve:
-      var minX = Math.min(e.x1, e.x2, pt.x),
-          maxX = Math.max(e.x1, e.x2, pt.x),
-          minY = Math.min(e.y1, e.y2, pt.y),
-          maxY = Math.max(e.y1, e.y2, pt.y);
-
-      return {
-        x1: minX - e.size,
-        y1: minY - e.size,
-        x2: maxX + e.size,
-        y2: minY - e.size,
-        height: maxY - minY + e.size * 2
-      };
-    },
-
-    /**
-     * Transforms a graph self loop into an axis-aligned square.
-     *
-     * @param  {object} n A graph node with a point (x, y) and a size.
-     * @return {object}   A square: two points (x1, y1), (x2, y2) and height.
-     */
-    selfLoopToSquare: function(n) {
-      // Fitting to the curve is too costly, we compute a larger bounding box
-      // using the control points:
-      var cp = sigma.utils.getSelfLoopControlPoints(n.x, n.y, n.size);
-
-      // Bounding box of the point and the two control points:
-      var minX = Math.min(n.x, cp.x1, cp.x2),
-          maxX = Math.max(n.x, cp.x1, cp.x2),
-          minY = Math.min(n.y, cp.y1, cp.y2),
-          maxY = Math.max(n.y, cp.y1, cp.y2);
-
-      return {
-        x1: minX - n.size,
-        y1: minY - n.size,
-        x2: maxX + n.size,
-        y2: minY - n.size,
-        height: maxY - minY + n.size * 2
-      };
-    },
-
-    /**
-     * Checks whether a rectangle is axis-aligned.
-     *
-     * @param  {object}  A rectangle defined by two points
-     *                   (x1, y1) and (x2, y2).
-     * @return {boolean} True if the rectangle is axis-aligned.
-     */
-    isAxisAligned: function(r) {
-      return r.x1 === r.x2 || r.y1 === r.y2;
-    },
-
-    /**
-     * Compute top points of an axis-aligned rectangle. This is useful in
-     * cases when the rectangle has been rotated (left, right or bottom up) and
-     * later operations need to know the top points.
-     *
-     * @param  {object} An axis-aligned rectangle defined by two points
-     *                  (x1, y1), (x2, y2) and height.
-     * @return {object} A rectangle: two points (x1, y1), (x2, y2) and height.
-     */
-    axisAlignedTopPoints: function(r) {
-
-      // Basic
-      if (r.y1 === r.y2 && r.x1 < r.x2)
-        return r;
-
-      // Rotated to right
-      if (r.x1 === r.x2 && r.y2 > r.y1)
-        return {
-          x1: r.x1 - r.height, y1: r.y1,
-          x2: r.x1, y2: r.y1,
-          height: r.height
-        };
-
-      // Rotated to left
-      if (r.x1 === r.x2 && r.y2 < r.y1)
-        return {
-          x1: r.x1, y1: r.y2,
-          x2: r.x2 + r.height, y2: r.y2,
-          height: r.height
-        };
-
-      // Bottom's up
-      return {
-        x1: r.x2, y1: r.y1 - r.height,
-        x2: r.x1, y2: r.y1 - r.height,
-        height: r.height
-      };
-    },
-
-    /**
-     * Get coordinates of a rectangle's lower left corner from its top points.
-     *
-     * @param  {object} A rectangle defined by two points (x1, y1) and (x2, y2).
-     * @return {object} Coordinates of the corner (x, y).
-     */
-    lowerLeftCoor: function(r) {
-      var width = (
-        Math.sqrt(
-          Math.pow(r.x2 - r.x1, 2) +
-          Math.pow(r.y2 - r.y1, 2)
-        )
-      );
-
-      return {
-        x: r.x1 - (r.y2 - r.y1) * r.height / width,
-        y: r.y1 + (r.x2 - r.x1) * r.height / width
-      };
-    },
-
-    /**
-     * Get coordinates of a rectangle's lower right corner from its top points
-     * and its lower left corner.
-     *
-     * @param  {object} A rectangle defined by two points (x1, y1) and (x2, y2).
-     * @param  {object} A corner's coordinates (x, y).
-     * @return {object} Coordinates of the corner (x, y).
-     */
-    lowerRightCoor: function(r, llc) {
-      return {
-        x: llc.x - r.x1 + r.x2,
-        y: llc.y - r.y1 + r.y2
-      };
-    },
-
-    /**
-     * Get the coordinates of all the corners of a rectangle from its top point.
-     *
-     * @param  {object} A rectangle defined by two points (x1, y1) and (x2, y2).
-     * @return {array}  An array of the four corners' coordinates (x, y).
-     */
-    rectangleCorners: function(r) {
-      var llc = this.lowerLeftCoor(r),
-          lrc = this.lowerRightCoor(r, llc);
-
-      return [
-        {x: r.x1, y: r.y1},
-        {x: r.x2, y: r.y2},
-        {x: llc.x, y: llc.y},
-        {x: lrc.x, y: lrc.y}
-      ];
-    },
-
-    /**
-     * Split a square defined by its boundaries into four.
-     *
-     * @param  {object} Boundaries of the square (x, y, width, height).
-     * @return {array}  An array containing the four new squares, themselves
-     *                  defined by an array of their four corners (x, y).
-     */
-    splitSquare: function(b) {
-      return [
-        [
-          {x: b.x, y: b.y},
-          {x: b.x + b.width / 2, y: b.y},
-          {x: b.x, y: b.y + b.height / 2},
-          {x: b.x + b.width / 2, y: b.y + b.height / 2}
-        ],
-        [
-          {x: b.x + b.width / 2, y: b.y},
-          {x: b.x + b.width, y: b.y},
-          {x: b.x + b.width / 2, y: b.y + b.height / 2},
-          {x: b.x + b.width, y: b.y + b.height / 2}
-        ],
-        [
-          {x: b.x, y: b.y + b.height / 2},
-          {x: b.x + b.width / 2, y: b.y + b.height / 2},
-          {x: b.x, y: b.y + b.height},
-          {x: b.x + b.width / 2, y: b.y + b.height}
-        ],
-        [
-          {x: b.x + b.width / 2, y: b.y + b.height / 2},
-          {x: b.x + b.width, y: b.y + b.height / 2},
-          {x: b.x + b.width / 2, y: b.y + b.height},
-          {x: b.x + b.width, y: b.y + b.height}
-        ]
-      ];
-    },
-
-    /**
-     * Compute the four axis between corners of rectangle A and corners of
-     * rectangle B. This is needed later to check an eventual collision.
-     *
-     * @param  {array} An array of rectangle A's four corners (x, y).
-     * @param  {array} An array of rectangle B's four corners (x, y).
-     * @return {array} An array of four axis defined by their coordinates (x,y).
-     */
-    axis: function(c1, c2) {
-      return [
-        {x: c1[1].x - c1[0].x, y: c1[1].y - c1[0].y},
-        {x: c1[1].x - c1[3].x, y: c1[1].y - c1[3].y},
-        {x: c2[0].x - c2[2].x, y: c2[0].y - c2[2].y},
-        {x: c2[0].x - c2[1].x, y: c2[0].y - c2[1].y}
-      ];
-    },
-
-    /**
-     * Project a rectangle's corner on an axis.
-     *
-     * @param  {object} Coordinates of a corner (x, y).
-     * @param  {object} Coordinates of an axis (x, y).
-     * @return {object} The projection defined by coordinates (x, y).
-     */
-    projection: function(c, a) {
-      var l = (
-        (c.x * a.x + c.y * a.y) /
-        (Math.pow(a.x, 2) + Math.pow(a.y, 2))
-      );
-
-      return {
-        x: l * a.x,
-        y: l * a.y
-      };
-    },
-
-    /**
-     * Check whether two rectangles collide on one particular axis.
-     *
-     * @param  {object}   An axis' coordinates (x, y).
-     * @param  {array}    Rectangle A's corners.
-     * @param  {array}    Rectangle B's corners.
-     * @return {boolean}  True if the rectangles collide on the axis.
-     */
-    axisCollision: function(a, c1, c2) {
-      var sc1 = [],
-          sc2 = [];
-
-      for (var ci = 0; ci < 4; ci++) {
-        var p1 = this.projection(c1[ci], a),
-            p2 = this.projection(c2[ci], a);
-
-        sc1.push(p1.x * a.x + p1.y * a.y);
-        sc2.push(p2.x * a.x + p2.y * a.y);
-      }
-
-      var maxc1 = Math.max.apply(Math, sc1),
-          maxc2 = Math.max.apply(Math, sc2),
-          minc1 = Math.min.apply(Math, sc1),
-          minc2 = Math.min.apply(Math, sc2);
-
-      return (minc2 <= maxc1 && maxc2 >= minc1);
-    },
-
-    /**
-     * Check whether two rectangles collide on each one of their four axis. If
-     * all axis collide, then the two rectangles do collide on the plane.
-     *
-     * @param  {array}    Rectangle A's corners.
-     * @param  {array}    Rectangle B's corners.
-     * @return {boolean}  True if the rectangles collide.
-     */
-    collision: function(c1, c2) {
-      var axis = this.axis(c1, c2),
-          col = true;
-
-      for (var i = 0; i < 4; i++)
-        col = col && this.axisCollision(axis[i], c1, c2);
-
-      return col;
-    }
-  };
-
-
-  /**
-   * Quad Functions
-   * ------------
-   *
-   * The Quadtree functions themselves.
-   * For each of those functions, we consider that in a splitted quad, the
-   * index of each node is the following:
-   * 0: top left
-   * 1: top right
-   * 2: bottom left
-   * 3: bottom right
-   *
-   * Moreover, the hereafter quad's philosophy is to consider that if an element
-   * collides with more than one nodes, this element belongs to each of the
-   * nodes it collides with where other would let it lie on a higher node.
-   */
-
-  /**
-   * Get the index of the node containing the point in the quad
-   *
-   * @param  {object}  point      A point defined by coordinates (x, y).
-   * @param  {object}  quadBounds Boundaries of the quad (x, y, width, heigth).
-   * @return {integer}            The index of the node containing the point.
-   */
-  function _quadIndex(point, quadBounds) {
-    var xmp = quadBounds.x + quadBounds.width / 2,
-        ymp = quadBounds.y + quadBounds.height / 2,
-        top = (point.y < ymp),
-        left = (point.x < xmp);
-
-    if (top) {
-      if (left)
-        return 0;
-      else
-        return 1;
-    }
-    else {
-      if (left)
-        return 2;
-      else
-        return 3;
-    }
-  }
-
-  /**
-   * Get a list of indexes of nodes containing an axis-aligned rectangle
-   *
-   * @param  {object}  rectangle   A rectangle defined by two points (x1, y1),
-   *                               (x2, y2) and height.
-   * @param  {array}   quadCorners An array of the quad nodes' corners.
-   * @return {array}               An array of indexes containing one to
-   *                               four integers.
-   */
-  function _quadIndexes(rectangle, quadCorners) {
-    var indexes = [];
-
-    // Iterating through quads
-    for (var i = 0; i < 4; i++)
-      if ((rectangle.x2 >= quadCorners[i][0].x) &&
-          (rectangle.x1 <= quadCorners[i][1].x) &&
-          (rectangle.y1 + rectangle.height >= quadCorners[i][0].y) &&
-          (rectangle.y1 <= quadCorners[i][2].y))
-        indexes.push(i);
-
-    return indexes;
-  }
-
-  /**
-   * Get a list of indexes of nodes containing a non-axis-aligned rectangle
-   *
-   * @param  {array}  corners      An array containing each corner of the
-   *                               rectangle defined by its coordinates (x, y).
-   * @param  {array}  quadCorners  An array of the quad nodes' corners.
-   * @return {array}               An array of indexes containing one to
-   *                               four integers.
-   */
-  function _quadCollision(corners, quadCorners) {
-    var indexes = [];
-
-    // Iterating through quads
-    for (var i = 0; i < 4; i++)
-      if (_geom.collision(corners, quadCorners[i]))
-        indexes.push(i);
-
-    return indexes;
-  }
-
-  /**
-   * Subdivide a quad by creating a node at a precise index. The function does
-   * not generate all four nodes not to potentially create unused nodes.
-   *
-   * @param  {integer}  index The index of the node to create.
-   * @param  {object}   quad  The quad object to subdivide.
-   * @return {object}         A new quad representing the node created.
-   */
-  function _quadSubdivide(index, quad) {
-    var next = quad.level + 1,
-        subw = Math.round(quad.bounds.width / 2),
-        subh = Math.round(quad.bounds.height / 2),
-        qx = Math.round(quad.bounds.x),
-        qy = Math.round(quad.bounds.y),
-        x,
-        y;
-
-    switch (index) {
-      case 0:
-        x = qx;
-        y = qy;
-        break;
-      case 1:
-        x = qx + subw;
-        y = qy;
-        break;
-      case 2:
-        x = qx;
-        y = qy + subh;
-        break;
-      case 3:
-        x = qx + subw;
-        y = qy + subh;
-        break;
-    }
-
-    return _quadTree(
-      {x: x, y: y, width: subw, height: subh},
-      next,
-      quad.maxElements,
-      quad.maxLevel
-    );
-  }
-
-  /**
-   * Recursively insert an element into the quadtree. Only points
-   * with size, i.e. axis-aligned squares, may be inserted with this
-   * method.
-   *
-   * @param  {object}  el         The element to insert in the quadtree.
-   * @param  {object}  sizedPoint A sized point defined by two top points
-   *                              (x1, y1), (x2, y2) and height.
-   * @param  {object}  quad       The quad in which to insert the element.
-   * @return {undefined}          The function does not return anything.
-   */
-  function _quadInsert(el, sizedPoint, quad) {
-    if (quad.level < quad.maxLevel) {
-
-      // Searching appropriate quads
-      var indexes = _quadIndexes(sizedPoint, quad.corners);
-
-      // Iterating
-      for (var i = 0, l = indexes.length; i < l; i++) {
-
-        // Subdividing if necessary
-        if (quad.nodes[indexes[i]] === undefined)
-          quad.nodes[indexes[i]] = _quadSubdivide(indexes[i], quad);
-
-        // Recursion
-        _quadInsert(el, sizedPoint, quad.nodes[indexes[i]]);
-      }
-    }
-    else {
-
-      // Pushing the element in a leaf node
-      quad.elements.push(el);
-    }
-  }
-
-  /**
-   * Recursively retrieve every elements held by the node containing the
-   * searched point.
-   *
-   * @param  {object}  point The searched point (x, y).
-   * @param  {object}  quad  The searched quad.
-   * @return {array}         An array of elements contained in the relevant
-   *                         node.
-   */
-  function _quadRetrievePoint(point, quad) {
-    if (quad.level < quad.maxLevel) {
-      var index = _quadIndex(point, quad.bounds);
-
-      // If node does not exist we return an empty list
-      if (quad.nodes[index] !== undefined) {
-        return _quadRetrievePoint(point, quad.nodes[index]);
-      }
-      else {
-        return [];
-      }
-    }
-    else {
-      return quad.elements;
-    }
-  }
-
-  /**
-   * Recursively retrieve every elements contained within an rectangular area
-   * that may or may not be axis-aligned.
-   *
-   * @param  {object|array} rectData       The searched area defined either by
-   *                                       an array of four corners (x, y) in
-   *                                       the case of a non-axis-aligned
-   *                                       rectangle or an object with two top
-   *                                       points (x1, y1), (x2, y2) and height.
-   * @param  {object}       quad           The searched quad.
-   * @param  {function}     collisionFunc  The collision function used to search
-   *                                       for node indexes.
-   * @param  {array?}       els            The retrieved elements.
-   * @return {array}                       An array of elements contained in the
-   *                                       area.
-   */
-  function _quadRetrieveArea(rectData, quad, collisionFunc, els) {
-    els = els || {};
-
-    if (quad.level < quad.maxLevel) {
-      var indexes = collisionFunc(rectData, quad.corners);
-
-      for (var i = 0, l = indexes.length; i < l; i++)
-        if (quad.nodes[indexes[i]] !== undefined)
-          _quadRetrieveArea(
-            rectData,
-            quad.nodes[indexes[i]],
-            collisionFunc,
-            els
-          );
-    } else
-      for (var j = 0, m = quad.elements.length; j < m; j++)
-        if (els[quad.elements[j].id] === undefined)
-          els[quad.elements[j].id] = quad.elements[j];
-
-    return els;
-  }
-
-  /**
-   * Creates the quadtree object itself.
-   *
-   * @param  {object}   bounds       The boundaries of the quad defined by an
-   *                                 origin (x, y), width and heigth.
-   * @param  {integer}  level        The level of the quad in the tree.
-   * @param  {integer}  maxElements  The max number of element in a leaf node.
-   * @param  {integer}  maxLevel     The max recursion level of the tree.
-   * @return {object}                The quadtree object.
-   */
-  function _quadTree(bounds, level, maxElements, maxLevel) {
-    return {
-      level: level || 0,
-      bounds: bounds,
-      corners: _geom.splitSquare(bounds),
-      maxElements: maxElements || 40,
-      maxLevel: maxLevel || 8,
-      elements: [],
-      nodes: []
-    };
-  }
-
-
-  /**
-   * Sigma Quad Constructor
-   * ----------------------
-   *
-   * The edgequad API as exposed to sigma.
-   */
-
-  /**
-   * The edgequad core that will become the sigma interface with the quadtree.
-   *
-   * property {object} _tree     Property holding the quadtree object.
-   * property {object} _geom     Exposition of the _geom namespace for testing.
-   * property {object} _cache    Cache for the area method.
-   * property {boolean} _enabled Can index and retreive elements.
-   */
-  var edgequad = function() {
-    this._geom = _geom;
-    this._tree = null;
-    this._cache = {
-      query: false,
-      result: false
-    };
-    this._enabled = true;
-  };
-
-  /**
-   * Index a graph by inserting its edges into the quadtree.
-   *
-   * @param  {object} graph   A graph instance.
-   * @param  {object} params  An object of parameters with at least the quad
-   *                          bounds.
-   * @return {object}         The quadtree object.
-   *
-   * Parameters:
-   * ----------
-   * bounds:      {object}   boundaries of the quad defined by its origin (x, y)
-   *                         width and heigth.
-   * prefix:      {string?}  a prefix for edge geometric attributes.
-   * maxElements: {integer?} the max number of elements in a leaf node.
-   * maxLevel:    {integer?} the max recursion level of the tree.
-   */
-  edgequad.prototype.index = function(graph, params) {
-    if (!this._enabled)
-      return this._tree;
-
-    // Enforcing presence of boundaries
-    if (!params.bounds)
-      throw 'sigma.classes.edgequad.index: bounds information not given.';
-
-    // Prefix
-    var prefix = params.prefix || '',
-        cp,
-        source,
-        target,
-        n,
-        e;
-
-    // Building the tree
-    this._tree = _quadTree(
-      params.bounds,
-      0,
-      params.maxElements,
-      params.maxLevel
-    );
-
-    var edges = graph.edges();
-
-    // Inserting graph edges into the tree
-    for (var i = 0, l = edges.length; i < l; i++) {
-      source = graph.nodes(edges[i].source);
-      target = graph.nodes(edges[i].target);
-      e = {
-        x1: source[prefix + 'x'],
-        y1: source[prefix + 'y'],
-        x2: target[prefix + 'x'],
-        y2: target[prefix + 'y'],
-        size: edges[i][prefix + 'size'] || 0
-      };
-
-      // Inserting edge
-      if (edges[i].type === 'curve' || edges[i].type === 'curvedArrow') {
-        if (source.id === target.id) {
-          n = {
-            x: source[prefix + 'x'],
-            y: source[prefix + 'y'],
-            size: source[prefix + 'size'] || 0
-          };
-          _quadInsert(
-            edges[i],
-            _geom.selfLoopToSquare(n),
-            this._tree);
-        }
-        else {
-          cp = sigma.utils.getQuadraticControlPoint(e.x1, e.y1, e.x2, e.y2);
-          _quadInsert(
-            edges[i],
-            _geom.quadraticCurveToSquare(e, cp),
-            this._tree);
-        }
-      }
-      else {
-        _quadInsert(
-          edges[i],
-          _geom.lineToSquare(e),
-          this._tree);
-      }
-    }
-
-    // Reset cache:
-    this._cache = {
-      query: false,
-      result: false
-    };
-
-    // remove?
-    return this._tree;
-  };
-
-  /**
-   * Retrieve every graph edges held by the quadtree node containing the
-   * searched point.
-   *
-   * @param  {number} x of the point.
-   * @param  {number} y of the point.
-   * @return {array}  An array of edges retrieved.
-   */
-  edgequad.prototype.point = function(x, y) {
-    if (!this._enabled)
-      return [];
-
-    return this._tree ?
-      _quadRetrievePoint({x: x, y: y}, this._tree) || [] :
-      [];
-  };
-
-  /**
-   * Retrieve every graph edges within a rectangular area. The methods keep the
-   * last area queried in cache for optimization reason and will act differently
-   * for the same reason if the area is axis-aligned or not.
-   *
-   * @param  {object} A rectangle defined by two top points (x1, y1), (x2, y2)
-   *                  and height.
-   * @return {array}  An array of edges retrieved.
-   */
-  edgequad.prototype.area = function(rect) {
-    if (!this._enabled)
-      return [];
-
-    var serialized = JSON.stringify(rect),
-        collisionFunc,
-        rectData;
-
-    // Returning cache?
-    if (this._cache.query === serialized)
-      return this._cache.result;
-
-    // Axis aligned ?
-    if (_geom.isAxisAligned(rect)) {
-      collisionFunc = _quadIndexes;
-      rectData = _geom.axisAlignedTopPoints(rect);
-    }
-    else {
-      collisionFunc = _quadCollision;
-      rectData = _geom.rectangleCorners(rect);
-    }
-
-    // Retrieving edges
-    var edges = this._tree ?
-      _quadRetrieveArea(
-        rectData,
-        this._tree,
-        collisionFunc
-      ) :
-      [];
-
-    // Object to array
-    var edgesArray = [];
-    for (var i in edges)
-      edgesArray.push(edges[i]);
-
-    // Caching
-    this._cache.query = serialized;
-    this._cache.result = edgesArray;
-
-    return edgesArray;
-  };
-
-
-  /**
-   * EXPORT:
-   * *******
-   */
-  if (typeof this.sigma !== 'undefined') {
-    this.sigma.classes = this.sigma.classes || {};
-    this.sigma.classes.edgequad = edgequad;
-  } else if (typeof exports !== 'undefined') {
-    if (typeof module !== 'undefined' && module.exports)
-      exports = module.exports = edgequad;
-    exports.edgequad = edgequad;
-  } else
-    this.edgequad = edgequad;
 }).call(this);
 
 ;(function(undefined) {
@@ -6078,6 +5808,8 @@ if (typeof exports !== 'undefined') {
         _downStartTime,
         _movingTimeoutId;
 
+    this.eltFocused = false;
+
     sigma.classes.dispatcher.extend(this);
 
     sigma.utils.doubleClick(_target, 'click', _doubleClickHandler);
@@ -6087,6 +5819,7 @@ if (typeof exports !== 'undefined') {
     _target.addEventListener('mousedown', _downHandler, false);
     _target.addEventListener('click', _clickHandler, false);
     _target.addEventListener('mouseout', _outHandler, false);
+    _target.addEventListener('mouseenter', _enterHandler, false);
     document.addEventListener('mouseup', _upHandler, false);
 
 
@@ -6111,6 +5844,12 @@ if (typeof exports !== 'undefined') {
 
     // MOUSE EVENTS:
     // *************
+
+    function _enterHandler(e) {
+      if (!_settings('clickToFocus')) {
+        target.focus();
+      }
+    }
 
     /**
      * The handler listening to the 'move' mouse event. It will effectively
@@ -6269,6 +6008,9 @@ if (typeof exports !== 'undefined') {
      * @param {event} e A mouse event.
      */
     function _outHandler(e) {
+      _self.eltFocused = false;
+      target.blur();
+
       if (_settings('mouseEnabled'))
         _self.dispatchEvent('mouseout');
     }
@@ -6280,6 +6022,9 @@ if (typeof exports !== 'undefined') {
      * @param {event} e A mouse event.
      */
     function _clickHandler(e) {
+      _self.eltFocused = true;
+      target.focus();
+
       if (_settings('mouseEnabled')) {
         var event = sigma.utils.mouseCoords(e);
         event.isDragging =
@@ -6346,11 +6091,10 @@ if (typeof exports !== 'undefined') {
     function _wheelHandler(e) {
       var pos,
           ratio,
-          animation,
-          wheelDelta = sigma.utils.getDelta(e);
+          animation;
 
-      if (_settings('mouseEnabled') && _settings('mouseWheelEnabled') && wheelDelta !== 0) {
-        ratio = wheelDelta > 0 ?
+      if (_settings('mouseEnabled') && _settings('mouseWheelEnabled') && (!_settings('clickToFocus') || _self.eltFocused)) {
+        ratio = sigma.utils.getDelta(e) > 0 ?
           1 / _settings('zoomingRatio') :
           _settings('zoomingRatio');
 
@@ -6818,8 +6562,7 @@ if (typeof exports !== 'undefined') {
     if (!(options.container instanceof HTMLElement))
       throw 'Container not found.';
 
-    var k,
-        i,
+    var i,
         l,
         a,
         fn,
@@ -6893,8 +6636,95 @@ if (typeof exports !== 'undefined') {
     this.resize(false);
   };
 
+  /**
+   * Static method to render edges or nodes with the given renderers
+   *
+   * @param  {object}       params     The parameters passed in an object
+   * {
+   *   renderers: {object}              Renderers indexed by types
+   *   type:      {string}              "edges" or "nodes"
+   *   ctx:       {Context2D}           Canvas Context to draw on
+   *   settings:  {object}              Settings object to use
+   *   elements:  {array}               Elements to render
+   *   graph?:    {sigma.classes.graph} Graph object
+   *                                    (only necessary for edge rendering)
+   *   start?:    {integer}             Starting index of the elements to render
+   *   end?:      {integer}             Last index of the elements to render
+   * }
+   */
+  sigma.renderers.canvas.applyRenderers = function(params) {
+    var i,
+        renderer,
+        specializedRenderer,
+        def,
+        render,
+        els = params.elements,
+        ctx_infos = {font: params.ctx.font},
+        elementType = (params.elements || params.type == 'edges' ?
+              'defaultEdgeType' : 'defaultNodeType');
+
+    params.start = params.start || 0;
+    params.end = params.end || params.elements.length;
+    params.end = Math.min(params.elements.length, params.end);
+
+    params.ctx.save();
+
+    for (i = params.start; i < params.end; i++) {
+      if (!els[i].hidden) {
+        specializedRenderer = params.renderers[
+          els[i].type || params.settings(elementType)
+        ];
+        def = (specializedRenderer || params.renderers.def);
+        if (params.type == 'edges') {
+          def(
+            els[i],
+            params.graph.nodes(els[i].source),
+            params.graph.nodes(els[i].target),
+            params.ctx,
+            params.settings,
+            {ctx: ctx_infos}
+          );
+        }else {
+          def(
+            els[i],
+            params.ctx,
+            params.settings,
+            {ctx: ctx_infos}
+          );
+        }
+      }
+    }
+
+    params.ctx.restore();
+  };
 
 
+  /**
+   * Render a batch of edges
+   *
+   * @param    {integer}      start    Starting index of the elements to render
+   * @param    {integer}      end      Last index of the elements to render
+   * @param    {object}       settings Settings to use
+   */
+  sigma.renderers.canvas.prototype.renderEdges =
+          function(start, end, settings) {
+    var renderParams = {
+      renderers: sigma.canvas.edges,
+      type: 'edges',
+      elements: this.edgesOnScreen,
+      ctx: this.contexts.edges,
+      start: start,
+      end: end,
+      graph: this.graph,
+      settings: settings
+    };
+    sigma.renderers.canvas.applyRenderers(renderParams);
+    if (settings('drawEdgeLabels')) {
+      renderParams.renderers = sigma.canvas.edges.labels;
+      renderParams.ctx = this.contexts.labels;
+      sigma.renderers.canvas.applyRenderers(renderParams);
+    }
+  };
 
   /**
    * This method renders the graph on the canvases.
@@ -6904,6 +6734,8 @@ if (typeof exports !== 'undefined') {
    */
   sigma.renderers.canvas.prototype.render = function(options) {
     options = options || {};
+
+    this.dispatchEvent('beforeRender');
 
     var a,
         i,
@@ -6915,8 +6747,6 @@ if (typeof exports !== 'undefined') {
         job,
         start,
         edges,
-        renderers,
-        rendererType,
         batchSize,
         tempGCO,
         index = {},
@@ -6926,7 +6756,6 @@ if (typeof exports !== 'undefined') {
         drawEdges = this.settings(options, 'drawEdges'),
         drawNodes = this.settings(options, 'drawNodes'),
         drawLabels = this.settings(options, 'drawLabels'),
-        drawEdgeLabels = this.settings(options, 'drawEdgeLabels'),
         embedSettings = this.settings.embedObjects(options, {
           prefix: this.options.prefix
         });
@@ -6958,7 +6787,6 @@ if (typeof exports !== 'undefined') {
         conrad.killJob(k);
 
     // Find which nodes are on screen:
-    this.edgesOnScreen = [];
     this.nodesOnScreen = this.camera.quadtree.area(
       this.camera.getRectangle(this.width, this.height)
     );
@@ -6970,21 +6798,27 @@ if (typeof exports !== 'undefined') {
     // - If settings('batchEdgesDrawing') is true, the edges are displayed per
     //   batches. If not, they are drawn in one frame.
     if (drawEdges) {
-      // First, let's identify which edges to draw. To do this, we just keep
-      // every edges that have at least one extremity displayed according to
-      // the quadtree and the "hidden" attribute. We also do not keep hidden
-      // edges.
-      for (a = graph.edges(), i = 0, l = a.length; i < l; i++) {
-        o = a[i];
-        if (
-          (index[o.source] || index[o.target]) &&
-          (!o.hidden && !nodes(o.source).hidden && !nodes(o.target).hidden)
-        )
-          this.edgesOnScreen.push(o);
+      this.edgesOnScreen = [];
+      if (embedSettings('edgesClippingWithNodes')) {
+        // Identify which edges to draw by keeping every edges that have at
+        // least one extremity displayed according to the quadtree and the
+        // "hidden" attribute. We also do not keep hidden edges.
+        for (a = graph.edges(), i = 0, l = a.length; i < l; i++) {
+          o = a[i];
+          if (
+            (index[o.source] || index[o.target]) &&
+            (!o.hidden && !nodes(o.source).hidden && !nodes(o.target).hidden)
+          )
+            this.edgesOnScreen.push(o);
+        }
+      } else {
+        this.edgesOnScreen = this.camera.edgequadtree.area(
+          this.camera.getRectangle(this.width, this.height)
+        );
       }
 
       // If the "batchEdgesDrawing" settings is true, edges are batched:
-      if (this.settings(options, 'batchEdgesDrawing')) {
+      if (embedSettings('batchEdgesDrawing')) {
         id = 'edges_' + this.conradId;
         batchSize = embedSettings('canvasEdgesBatchSize');
 
@@ -6998,37 +6832,7 @@ if (typeof exports !== 'undefined') {
           tempGCO = this.contexts.edges.globalCompositeOperation;
           this.contexts.edges.globalCompositeOperation = 'destination-over';
 
-          renderers = sigma.canvas.edges;
-          for (i = start; i < end; i++) {
-            o = edges[i];
-            (renderers[
-              o.type || this.settings(options, 'defaultEdgeType')
-            ] || renderers.def)(
-              o,
-              graph.nodes(o.source),
-              graph.nodes(o.target),
-              this.contexts.edges,
-              embedSettings
-            );
-          }
-
-          // Draw edge labels:
-          if (drawEdgeLabels) {
-            renderers = sigma.canvas.edges.labels;
-            for (i = start; i < end; i++) {
-              o = edges[i];
-              if (!o.hidden)
-                (renderers[
-                  o.type || this.settings(options, 'defaultEdgeType')
-                ] || renderers.def)(
-                  o,
-                  graph.nodes(o.source),
-                  graph.nodes(o.target),
-                  this.contexts.labels,
-                  embedSettings
-                );
-            }
-          }
+          this.renderEdges(start, end, embedSettings);
 
           // Restore original globalCompositeOperation:
           this.contexts.edges.globalCompositeOperation = tempGCO;
@@ -7049,67 +6853,32 @@ if (typeof exports !== 'undefined') {
 
       // If not, they are drawn in one frame:
       } else {
-        renderers = sigma.canvas.edges;
-        for (a = this.edgesOnScreen, i = 0, l = a.length; i < l; i++) {
-          o = a[i];
-          (renderers[
-            o.type || this.settings(options, 'defaultEdgeType')
-          ] || renderers.def)(
-            o,
-            graph.nodes(o.source),
-            graph.nodes(o.target),
-            this.contexts.edges,
-            embedSettings
-          );
-        }
-
-        // Draw edge labels:
-        // - No batching
-        if (drawEdgeLabels) {
-          renderers = sigma.canvas.edges.labels;
-          for (a = this.edgesOnScreen, i = 0, l = a.length; i < l; i++)
-            if (!a[i].hidden)
-              (renderers[
-                a[i].type || this.settings(options, 'defaultEdgeType')
-              ] || renderers.def)(
-                a[i],
-                graph.nodes(a[i].source),
-                graph.nodes(a[i].target),
-                this.contexts.labels,
-                embedSettings
-              );
-        }
+        this.renderEdges(0, this.edgesOnScreen.length, embedSettings);
       }
     }
 
     // Draw nodes:
     // - No batching
     if (drawNodes) {
-      renderers = sigma.canvas.nodes;
-      for (a = this.nodesOnScreen, i = 0, l = a.length; i < l; i++)
-        if (!a[i].hidden)
-          (renderers[
-            a[i].type || this.settings(options, 'defaultNodeType')
-          ] || renderers.def)(
-            a[i],
-            this.contexts.nodes,
-            embedSettings
-          );
+      sigma.renderers.canvas.applyRenderers({
+        renderers: sigma.canvas.nodes,
+        type: 'nodes',
+        ctx: this.contexts.nodes,
+        elements: this.nodesOnScreen,
+        settings: embedSettings
+      });
     }
 
     // Draw labels:
     // - No batching
     if (drawLabels) {
-      renderers = sigma.canvas.labels;
-      for (a = this.nodesOnScreen, i = 0, l = a.length; i < l; i++)
-        if (!a[i].hidden)
-          (renderers[
-            a[i].type || this.settings(options, 'defaultNodeType')
-          ] || renderers.def)(
-            a[i],
-            this.contexts.labels,
-            embedSettings
-          );
+      sigma.renderers.canvas.applyRenderers({
+        renderers: sigma.canvas.labels,
+        type: 'nodes',
+        ctx: this.contexts.labels,
+        elements: this.nodesOnScreen,
+        settings: embedSettings
+      });
     }
 
     this.dispatchEvent('render');
@@ -7996,6 +7765,7 @@ if (typeof exports !== 'undefined') {
       nodes: {},
       edges: {},
       labels: {},
+      edgelabels: {},
       hovers: {}
     };
     this.measurementCanvas = null;
@@ -8061,6 +7831,8 @@ if (typeof exports !== 'undefined') {
   sigma.renderers.svg.prototype.render = function(options) {
     options = options || {};
 
+    this.dispatchEvent('beforeRender');
+
     var a,
         i,
         k,
@@ -8080,6 +7852,8 @@ if (typeof exports !== 'undefined') {
         drawEdges = this.settings(options, 'drawEdges'),
         drawNodes = this.settings(options, 'drawNodes'),
         drawLabels = this.settings(options, 'drawLabels'),
+        drawEdgeLabels = this.settings(options, 'drawEdgeLabels'),
+        defaultEdgeType = this.settings(options, 'defaultEdgeType'),
         embedSettings = this.settings.embedObjects(options, {
           prefix: this.options.prefix,
           forceLabels: this.options.forceLabels
@@ -8105,6 +7879,7 @@ if (typeof exports !== 'undefined') {
     this.hideDOMElements(this.domElements.nodes);
     this.hideDOMElements(this.domElements.edges);
     this.hideDOMElements(this.domElements.labels);
+    this.hideDOMElements(this.domElements.edgelabels);
 
     // Find which nodes are on screen
     this.edgesOnScreen = [];
@@ -8146,13 +7921,15 @@ if (typeof exports !== 'undefined') {
           this.domElements.groups.nodes.appendChild(e);
 
           // Label
-          e = (subrenderers[a[i].type] || subrenderers.def).create(
-            a[i],
-            embedSettings
-          );
+          if (drawLabels) {
+            e = (subrenderers[a[i].type] || subrenderers.def).create(
+              a[i],
+              embedSettings
+            );
 
-          this.domElements.labels[a[i].id] = e;
-          this.domElements.groups.labels.appendChild(e);
+            this.domElements.labels[a[i].id] = e;
+            this.domElements.groups.labels.appendChild(e);
+          }
         }
       }
 
@@ -8171,16 +7948,19 @@ if (typeof exports !== 'undefined') {
         );
 
         // Label
-        (subrenderers[a[i].type] || subrenderers.def).update(
-          a[i],
-          this.domElements.labels[a[i].id],
-          embedSettings
-        );
+        if (drawLabels) {
+          (subrenderers[a[i].type] || subrenderers.def).update(
+            a[i],
+            this.domElements.labels[a[i].id],
+            embedSettings
+          );
+        }
       }
 
     // Display edges
     //---------------
     renderers = sigma.svg.edges;
+    subrenderers = sigma.svg.edges.labels;
 
     //-- First we create the edges which are not already created
     if (drawEdges)
@@ -8189,7 +7969,10 @@ if (typeof exports !== 'undefined') {
           source = nodes(a[i].source);
           target = nodes(a[i].target);
 
-          e = (renderers[a[i].type] || renderers.def).create(
+          e = (renderers[a[i].type] ||
+            renderers[defaultEdgeType] ||
+            renderers.def
+          ).create(
             a[i],
             source,
             target,
@@ -8198,6 +7981,20 @@ if (typeof exports !== 'undefined') {
 
           this.domElements.edges[a[i].id] = e;
           this.domElements.groups.edges.appendChild(e);
+
+          // Label
+          if (drawEdgeLabels) {
+
+            e = (subrenderers[a[i].type] ||
+              subrenderers[defaultEdgeType]  ||
+              subrenderers.def
+            ).create(
+              a[i],
+              embedSettings
+            );
+            this.domElements.edgelabels[a[i].id] = e;
+            this.domElements.groups.edgelabels.appendChild(e);
+          }
         }
        }
 
@@ -8207,13 +8004,30 @@ if (typeof exports !== 'undefined') {
         source = nodes(a[i].source);
         target = nodes(a[i].target);
 
-        (renderers[a[i].type] || renderers.def).update(
+        (renderers[a[i].type] ||
+          renderers[defaultEdgeType] ||
+          renderers.def
+        ).update(
           a[i],
           this.domElements.edges[a[i].id],
           source,
           target,
           embedSettings
         );
+
+        // Label
+        if (drawEdgeLabels) {
+          (subrenderers[a[i].type] ||
+            subrenderers[defaultEdgeType] ||
+            subrenderers.def
+          ).update(
+            a[i],
+            source,
+            target,
+            this.domElements.edgelabels[a[i].id],
+            embedSettings
+          );
+        }
        }
 
     this.dispatchEvent('render');
@@ -8252,7 +8066,7 @@ if (typeof exports !== 'undefined') {
     this.domElements.graph = this.container.appendChild(dom);
 
     // Creating groups
-    var groups = ['edges', 'nodes', 'labels', 'hovers'];
+    var groups = ['edges', 'nodes', 'edgelabels', 'labels', 'hovers'];
     for (i = 0, l = groups.length; i < l; i++) {
       g = document.createElementNS(this.settings('xmlns'), 'g');
 
@@ -8298,8 +8112,8 @@ if (typeof exports !== 'undefined') {
         self = this,
         hoveredNode;
 
-    function overNode(e) {
-      var node = e.data.node,
+    function updateHovers(e) {
+      var node,
           embedSettings = self.settings.embedObjects({
             prefix: prefix
           });
@@ -8307,40 +8121,35 @@ if (typeof exports !== 'undefined') {
       if (!embedSettings('enableHovering'))
         return;
 
-      var hover = (renderers[node.type] || renderers.def).create(
-        node,
-        self.domElements.nodes[node.id],
-        self.measurementCanvas,
-        embedSettings
-      );
+      if (e.data.enter.nodes.length > 0) { // over
+        node = e.data.enter.nodes[0];
+        var hover = (renderers[node.type] || renderers.def).create(
+          node,
+          self.domElements.nodes[node.id],
+          self.measurementCanvas,
+          embedSettings
+        );
 
-      self.domElements.hovers[node.id] = hover;
+        self.domElements.hovers[node.id] = hover;
 
-      // Inserting the hover in the dom
-      self.domElements.groups.hovers.appendChild(hover);
-      hoveredNode = node;
-    }
+        // Inserting the hover in the dom
+        self.domElements.groups.hovers.appendChild(hover);
+        hoveredNode = node;
+      } else if (e.data.leave.nodes.length > 0) { // out
+        node = e.data.leave.nodes[0];
 
-    function outNode(e) {
-      var node = e.data.node,
-          embedSettings = self.settings.embedObjects({
-            prefix: prefix
-          });
+        // Deleting element
+        self.domElements.groups.hovers.removeChild(
+          self.domElements.hovers[node.id]
+        );
+        hoveredNode = null;
+        delete self.domElements.hovers[node.id];
 
-      if (!embedSettings('enableHovering'))
-        return;
-
-      // Deleting element
-      self.domElements.groups.hovers.removeChild(
-        self.domElements.hovers[node.id]
-      );
-      hoveredNode = null;
-      delete self.domElements.hovers[node.id];
-
-      // Reinstate
-      self.domElements.groups.nodes.appendChild(
-        self.domElements.nodes[node.id]
-      );
+        // Reinstate
+        self.domElements.groups.nodes.appendChild(
+          self.domElements.nodes[node.id]
+        );
+      }
     }
 
     // OPTIMIZE: perform a real update rather than a deletion
@@ -8372,8 +8181,7 @@ if (typeof exports !== 'undefined') {
     }
 
     // Binding events
-    this.bind('overNode', overNode);
-    this.bind('outNode', outNode);
+    this.bind('hovers', updateHovers);
 
     // Update on render
     this.bind('render', update);
@@ -8389,8 +8197,7 @@ if (typeof exports !== 'undefined') {
    */
   sigma.renderers.svg.prototype.resize = function(w, h) {
     var oldWidth = this.width,
-        oldHeight = this.height,
-        pixelRatio = 1;
+        oldHeight = this.height;
 
     if (w !== undefined && h !== undefined) {
       this.width = w;
@@ -8398,24 +8205,15 @@ if (typeof exports !== 'undefined') {
     } else {
       this.width = this.container.offsetWidth;
       this.height = this.container.offsetHeight;
-
-      w = this.width;
-      h = this.height;
     }
 
     if (oldWidth !== this.width || oldHeight !== this.height) {
-      this.domElements.graph.style.width = w + 'px';
-      this.domElements.graph.style.height = h + 'px';
-
-      if (this.domElements.graph.tagName.toLowerCase() === 'svg') {
-        this.domElements.graph.setAttribute('width', (w * pixelRatio));
-        this.domElements.graph.setAttribute('height', (h * pixelRatio));
-      }
+      this.domElements.graph.style.width = this.width + 'px';
+      this.domElements.graph.style.height = this.height + 'px';
     }
 
     return this;
   };
-
 
   /**
    * The labels, nodes and edges renderers are stored in the three following
@@ -8428,6 +8226,7 @@ if (typeof exports !== 'undefined') {
   sigma.utils.pkg('sigma.svg.nodes');
   sigma.utils.pkg('sigma.svg.edges');
   sigma.utils.pkg('sigma.svg.labels');
+  sigma.utils.pkg('sigma.svg.edgelabels');
 }).call(this);
 
 ;(function(global) {
@@ -8439,23 +8238,8 @@ if (typeof exports !== 'undefined') {
   // Initialize packages:
   sigma.utils.pkg('sigma.renderers');
 
-  // Check if WebGL is enabled:
-  var canvas,
-      webgl = !!global.WebGLRenderingContext;
-  if (webgl) {
-    canvas = document.createElement('canvas');
-    try {
-      webgl = !!(
-        canvas.getContext('webgl') ||
-        canvas.getContext('experimental-webgl')
-      );
-    } catch (e) {
-      webgl = false;
-    }
-  }
-
   // Copy the good renderer:
-  sigma.renderers.def = webgl ?
+  sigma.renderers.def = sigma.utils.isWebGLSupported() ?
     sigma.renderers.webgl :
     sigma.renderers.canvas;
 })(this);
@@ -9648,18 +9432,26 @@ if (typeof exports !== 'undefined') {
   sigma.utils.pkg('sigma.canvas.labels');
 
   /**
-   * This label renderer will just display the label on the right of the node.
+   * This label renderer will display the label of the node
    *
    * @param  {object}                   node     The node object.
    * @param  {CanvasRenderingContext2D} context  The canvas context.
    * @param  {configurable}             settings The settings function.
+   * @param  {object?}                  infos    The batch infos.
    */
-  sigma.canvas.labels.def = function(node, context, settings) {
+  sigma.canvas.labels.def = function(node, context, settings, infos) {
     var fontSize,
         prefix = settings('prefix') || '',
-        size = node[prefix + 'size'];
+        size = node[prefix + 'size'] || 1,
+        fontStyle = settings('fontStyle'),
+        borderSize = settings('nodeBorderSize'),
+        labelWidth,
+        labelOffsetX,
+        labelOffsetY,
+        alignment = settings('labelAlignment'),
+        maxLineLength = settings('maxNodeLabelLineLength') || 0;
 
-    if (size < settings('labelThreshold'))
+    if (size <= settings('labelThreshold'))
       return;
 
     if (!node.label || typeof node.label !== 'string')
@@ -9669,18 +9461,132 @@ if (typeof exports !== 'undefined') {
       settings('defaultLabelSize') :
       settings('labelSizeRatio') * size;
 
-    context.font = (settings('fontStyle') ? settings('fontStyle') + ' ' : '') +
-      fontSize + 'px ' + settings('font');
-    context.fillStyle = (settings('labelColor') === 'node') ?
-      (node.color || settings('defaultNodeColor')) :
-      settings('defaultLabelColor');
+    var new_font = (fontStyle ? fontStyle + ' ' : '') +
+      fontSize + 'px ' +
+      (node.active ?
+        settings('activeFont') || settings('font') :
+        settings('font'));
 
-    context.fillText(
-      node.label,
-      Math.round(node[prefix + 'x'] + size + 3),
-      Math.round(node[prefix + 'y'] + fontSize / 3)
-    );
+    if (infos && infos.ctx.font != new_font) { //use font value caching
+      context.font = new_font;
+      infos.ctx.font = new_font;
+    } else {
+      context.font = new_font;
+    }
+
+    context.fillStyle =
+        (settings('labelColor') === 'node') ?
+        node.color || settings('defaultNodeColor') :
+        settings('defaultLabelColor');
+
+    labelOffsetX = 0;
+    labelOffsetY = fontSize / 3;
+    context.textAlign = 'center';
+
+    switch (alignment) {
+      case 'bottom':
+        labelOffsetY = + size + 4 * fontSize / 3;
+        break;
+      case 'center':
+        break;
+      case 'left':
+        context.textAlign = 'right';
+        labelOffsetX = - size - borderSize - 3;
+        break;
+      case 'top':
+        labelOffsetY = - size - 2 * fontSize / 3;
+        break;
+      case 'inside':
+        labelWidth = sigma.utils.canvas.getTextWidth(context, settings('approximateLabelWidth'), fontSize, node.label);
+        if (labelWidth <= (size + fontSize / 3) * 2) {
+          break;
+        }
+      /* falls through*/
+      case 'right':
+      /* falls through*/
+      default:
+        labelOffsetX = size + borderSize + 3;
+        context.textAlign = 'left';
+        break;
+    }
+
+    var lines = getLines(node.label, maxLineLength),
+        baseX = node[prefix + 'x'] + labelOffsetX,
+        baseY = Math.round(node[prefix + 'y'] + labelOffsetY);
+
+    for (var i = 0; i < lines.length; ++i) {
+      context.fillText(lines[i], baseX, baseY + i * (fontSize + 1));
+    }
   };
+
+  /**
+   * Split a text into several lines. Each line won't be longer than the specified maximum length.
+   * @param {string}  text            Text to split
+   * @param {number}  maxLineLength   Maximum length of a line. A value <= 1 will be treated as "infinity".
+   * @returns {Array<string>}         List of lines
+   */
+  function getLines(text, maxLineLength) {
+    if (maxLineLength <= 1) {
+      return [text];
+    }
+
+    var words = text.split(' '),
+        lines = [],
+        lineLength = 0,
+        lineIndex = -1,
+        lineList = [],
+        lineFull = true;
+
+    for (var i = 0; i < words.length; ++i) {
+      if (lineFull) {
+        if (words[i].length > maxLineLength) {
+          var parts = splitWord(words[i], maxLineLength);
+          for (var j = 0; j < parts.length; ++j) {
+            lines.push([parts[j]]);
+            ++lineIndex;
+          }
+          lineLength = parts[parts.length - 1].length;
+        } else {
+          lines.push([words[i]
+          ]);
+          ++lineIndex;
+          lineLength = words[i].length + 1;
+        }
+        lineFull = false;
+      } else if (lineLength + words[i].length <= maxLineLength) {
+        lines[lineIndex].push(words[i]);
+        lineLength += words[i].length + 1;
+      } else {
+        lineFull = true;
+        --i;
+      }
+    }
+
+    for (i = 0; i < lines.length; ++i) {
+      lineList.push(lines[i].join(' '))
+    }
+
+    return lineList;
+  }
+
+  /**
+   * Split a word into several lines (with a '-' at the end of each line but the last).
+   * @param {string} word       Word to split
+   * @param {number} maxLength  Maximum length of a line
+   * @returns {Array<string>}   List of lines
+   */
+  function splitWord(word, maxLength) {
+    var parts = [];
+
+    for (var i = 0; i < word.length; i += maxLength - 1) {
+      parts.push(word.substr(i, maxLength - 1) + '-');
+    }
+
+    var lastPartLen = parts[parts.length - 1].length;
+    parts[parts.length - 1] = parts[parts.length - 1].substr(0, lastPartLen - 1) + ' ';
+
+    return parts;
+  }
 }).call(this);
 
 ;(function(undefined) {
@@ -9705,12 +9611,21 @@ if (typeof exports !== 'undefined') {
         w,
         h,
         e,
+        labelX,
+        labelY,
+        lines,
+        baseX,
+        baseY,
+        borderSize = settings('nodeBorderSize'),
+        alignment = settings('labelAlignment'),
         fontStyle = settings('hoverFontStyle') || settings('fontStyle'),
         prefix = settings('prefix') || '',
         size = node[prefix + 'size'],
+        maxLineLength = settings('maxNodeLabelLineLength') || 0,
         fontSize = (settings('labelSize') === 'fixed') ?
           settings('defaultLabelSize') :
           settings('labelSizeRatio') * size;
+
 
     // Label background:
     context.font = (fontStyle ? fontStyle + ' ' : '') +
@@ -9721,40 +9636,18 @@ if (typeof exports !== 'undefined') {
       (node.color || settings('defaultNodeColor')) :
       settings('defaultHoverLabelBGColor');
 
-    if (node.label && settings('labelHoverShadow')) {
+    if (settings('labelHoverShadow')) {
       context.shadowOffsetX = 0;
       context.shadowOffsetY = 0;
       context.shadowBlur = 8;
       context.shadowColor = settings('labelHoverShadowColor');
     }
 
-    if (node.label && typeof node.label === 'string') {
-      x = Math.round(node[prefix + 'x'] - fontSize / 2 - 2);
-      y = Math.round(node[prefix + 'y'] - fontSize / 2 - 2);
-      w = Math.round(
-        context.measureText(node.label).width + fontSize / 2 + size + 7
-      );
-      h = Math.round(fontSize + 4);
-      e = Math.round(fontSize / 2 + 2);
-
-      context.moveTo(x, y + e);
-      context.arcTo(x, y, x + e, y, e);
-      context.lineTo(x + w, y);
-      context.lineTo(x + w, y + h);
-      context.lineTo(x + e, y + h);
-      context.arcTo(x, y + h, x, y + h - e, e);
-      context.lineTo(x, y + e);
-
-      context.closePath();
-      context.fill();
-
-      context.shadowOffsetX = 0;
-      context.shadowOffsetY = 0;
-      context.shadowBlur = 0;
-    }
+    lines = getLines(node.label, maxLineLength);
+    drawHoverBorder(alignment, context, fontSize, node, lines, maxLineLength);
 
     // Node border:
-    if (settings('borderSize') > 0) {
+    if (borderSize > 0) {
       context.beginPath();
       context.fillStyle = settings('nodeBorderColor') === 'node' ?
         (node.color || settings('defaultNodeColor')) :
@@ -9762,7 +9655,7 @@ if (typeof exports !== 'undefined') {
       context.arc(
         node[prefix + 'x'],
         node[prefix + 'y'],
-        size + settings('borderSize'),
+        size + borderSize,
         0,
         Math.PI * 2,
         true
@@ -9780,12 +9673,182 @@ if (typeof exports !== 'undefined') {
       context.fillStyle = (settings('labelHoverColor') === 'node') ?
         (node.color || settings('defaultNodeColor')) :
         settings('defaultLabelHoverColor');
+      var labelWidth = sigma.utils.canvas.getTextWidth(context,
+            settings('approximateLabelWidth'), fontSize, node.label),
+          labelOffsetX = - labelWidth / 2,
+          labelOffsetY = fontSize / 3;
 
-      context.fillText(
-        node.label,
-        Math.round(node[prefix + 'x'] + size + 3),
-        Math.round(node[prefix + 'y'] + fontSize / 3)
-      );
+      switch (alignment) {
+        case 'bottom':
+          labelOffsetY = + size + 4 * fontSize / 3;
+          break;
+        case 'center':
+          break;
+        case 'left':
+          labelOffsetX = - size - borderSize - 3 - labelWidth;
+          break;
+        case 'top':
+          labelOffsetY = - size - 2 * fontSize / 3;
+          break;
+        case 'inside':
+          if (labelWidth <= (size + fontSize / 3) * 2) {
+            break;
+          }
+        /* falls through*/
+        case 'right':
+        /* falls through*/
+        default:
+          labelOffsetX = size + borderSize + 3;
+          break;
+      }
+
+      baseX = node[prefix + 'x'] + labelOffsetX;
+      baseY = Math.round(node[prefix + 'y'] + labelOffsetY);
+
+      for (var i = 0; i < lines.length; ++i) {
+        context.fillText(lines[i], baseX, baseY + i * (fontSize + 1));
+      }
+    }
+
+    function drawHoverBorder(alignment, context, fontSize, node, lines, maxLineLength) {
+      var labelWidth =
+        (maxLineLength > 1 && lines.length > 1) ?
+        0.6 * maxLineLength * fontSize :
+        sigma.utils.canvas.getTextWidth(
+          context,
+          settings('approximateLabelWidth'),
+          fontSize,
+          lines[0]
+        );
+
+      var x = Math.round(node[prefix + 'x']),
+          y = Math.round(node[prefix + 'y']),
+          h = ((fontSize + 1) * lines.length) + 4,
+          e = Math.round(size + fontSize / 4),
+          w = Math.round(labelWidth + size + 1.5 + fontSize / 3);
+
+      if (node.label && typeof node.label === 'string') {
+        // draw a rectangle for the label
+        switch (alignment) {
+          case 'center':
+            break;
+          case 'left':
+            x = Math.round(node[prefix + 'x'] + fontSize / 2 + 2);
+            y = Math.round(node[prefix + 'y'] - fontSize / 2 - 2);
+
+            context.moveTo(x, y + e);
+            context.arcTo(x, y, x - e, y, e);
+            context.lineTo(x - w - borderSize - e, y);
+            context.lineTo(x - w - borderSize - e, y + h);
+            context.lineTo(x - e, y + h);
+            context.arcTo(x, y + h, x, y + h - e, e);
+            context.lineTo(x, y + e);
+            break;
+          case 'top':
+            context.rect(x - w / 2, y - e - h, w, h);
+            break;
+          case 'bottom':
+            context.rect(x - w / 2, y + e, w, h);
+            break;
+          case 'inside':
+            if (labelWidth <= e * 2) {
+              // don't draw anything
+              break;
+            }
+            // use default setting, falling through
+          /* falls through*/
+          case 'right':
+          /* falls through*/
+          default:
+            x = Math.round(node[prefix + 'x'] - fontSize / 2 - 2);
+            y = Math.round(node[prefix + 'y'] - fontSize / 2 - 2);
+
+            context.moveTo(x, y + e);
+            context.arcTo(x, y, x + e, y, e);
+            context.lineTo(x + w + borderSize + e, y);
+            context.lineTo(x + w + borderSize + e, y + h);
+            context.lineTo(x + e, y + h);
+            context.arcTo(x, y + h, x, y + h - e, e);
+            context.lineTo(x, y + e);
+            break;
+        }
+      }
+
+      context.closePath();
+      context.fill();
+
+      context.shadowOffsetX = 0;
+      context.shadowOffsetY = 0;
+      context.shadowBlur = 0;
+    }
+
+    /**
+     * Split a text into several lines. Each line won't be longer than the specified maximum length.
+     * @param {string}  text            Text to split
+     * @param {number}  maxLineLength   Maximum length of a line. A value <= 1 will be treated as "infinity".
+     * @returns {Array<string>}         List of lines
+     */
+    function getLines(text, maxLineLength) {
+      if (maxLineLength <= 1) {
+        return [text];
+      }
+
+      var words = text.split(' '),
+        lines = [],
+        lineLength = 0,
+        lineIndex = -1,
+        lineList = [],
+        lineFull = true;
+
+      for (var i = 0; i < words.length; ++i) {
+        if (lineFull) {
+          if (words[i].length > maxLineLength) {
+            var parts = splitWord(words[i], maxLineLength);
+            for (var j = 0; j < parts.length; ++j) {
+              lines.push([parts[j]]);
+              ++lineIndex;
+            }
+            lineLength = parts[parts.length - 1].length;
+          } else {
+            lines.push([words[i]
+            ]);
+            ++lineIndex;
+            lineLength = words[i].length + 1;
+          }
+          lineFull = false;
+        } else if (lineLength + words[i].length <= maxLineLength) {
+          lines[lineIndex].push(words[i]);
+          lineLength += words[i].length + 1;
+        } else {
+          lineFull = true;
+          --i;
+        }
+      }
+
+      for (i = 0; i < lines.length; ++i) {
+        lineList.push(lines[i].join(' '))
+      }
+
+      return lineList;
+    }
+
+    /**
+     * Split a word into several lines (with a '-' at the end of each line but the last).
+     * @param {string} word       Word to split
+     * @param {number} maxLength  Maximum length of a line
+     * @returns {Array<string>}   List of lines
+     */
+    function splitWord(word, maxLength) {
+      var parts = [];
+
+      for (var i = 0; i < word.length; i += maxLength - 1) {
+        parts.push(word.substr(i, maxLength - 1) + '-');
+      }
+
+      var lastPartLen = parts[parts.length - 1].length;
+      parts[parts.length - 1] = parts[parts.length - 1].substr(0, lastPartLen - 1) + ' ';
+
+      return parts;
     }
   };
 }).call(this);
@@ -9877,6 +9940,64 @@ if (typeof exports !== 'undefined') {
   sigma.utils.pkg('sigma.canvas.edges');
 
   /**
+   * This edge renderer will display edges as curves.
+   *
+   * @param  {object}                   edge         The edge object.
+   * @param  {object}                   source node  The edge source node.
+   * @param  {object}                   target node  The edge target node.
+   * @param  {CanvasRenderingContext2D} context      The canvas context.
+   * @param  {configurable}             settings     The settings function.
+   */
+  sigma.canvas.edges.curve = function(edge, source, target, context, settings) {
+    var color = edge.color,
+        prefix = settings('prefix') || '',
+        size = edge[prefix + 'size'] || 1,
+        edgeColor = settings('edgeColor'),
+        defaultNodeColor = settings('defaultNodeColor'),
+        defaultEdgeColor = settings('defaultEdgeColor'),
+        cp = {},
+        sSize = source[prefix + 'size'],
+        sX = source[prefix + 'x'],
+        sY = source[prefix + 'y'],
+        tX = target[prefix + 'x'],
+        tY = target[prefix + 'y'];
+
+    cp = (source.id === target.id) ?
+      sigma.utils.getSelfLoopControlPoints(sX, sY, sSize) :
+      sigma.utils.getQuadraticControlPoint(sX, sY, tX, tY, edge.cc);
+
+    if (!color)
+      switch (edgeColor) {
+        case 'source':
+          color = source.color || defaultNodeColor;
+          break;
+        case 'target':
+          color = target.color || defaultNodeColor;
+          break;
+        default:
+          color = defaultEdgeColor;
+          break;
+      }
+
+    context.strokeStyle = color;
+    context.lineWidth = size;
+    context.beginPath();
+    context.moveTo(sX, sY);
+    if (source.id === target.id) {
+      context.bezierCurveTo(cp.x1, cp.y1, cp.x2, cp.y2, tX, tY);
+    } else {
+      context.quadraticCurveTo(cp.x, cp.y, tX, tY);
+    }
+    context.stroke();
+  };
+})();
+
+;(function() {
+  'use strict';
+
+  sigma.utils.pkg('sigma.canvas.edges');
+
+  /**
    * This edge renderer will display edges as arrows going from the source node
    *
    * @param  {object}                   edge         The edge object.
@@ -9898,7 +10019,7 @@ if (typeof exports !== 'undefined') {
         tX = target[prefix + 'x'],
         tY = target[prefix + 'y'],
         aSize = Math.max(size * 2.5, settings('minArrowSize')),
-        d = Math.sqrt(Math.pow(tX - sX, 2) + Math.pow(tY - sY, 2)),
+        d = Math.sqrt((tX - sX) * (tX - sX) + (tY - sY) * (tY - sY)),
         aX = sX + (tX - sX) * (d - aSize - tSize) / d,
         aY = sY + (tY - sY) * (d - aSize - tSize) / d,
         vX = (tX - sX) * aSize / d,
@@ -9925,6 +10046,95 @@ if (typeof exports !== 'undefined') {
       aX,
       aY
     );
+    context.stroke();
+
+    context.fillStyle = color;
+    context.beginPath();
+    context.moveTo(aX + vX, aY + vY);
+    context.lineTo(aX + vY * 0.6, aY - vX * 0.6);
+    context.lineTo(aX - vY * 0.6, aY + vX * 0.6);
+    context.lineTo(aX + vX, aY + vY);
+    context.closePath();
+    context.fill();
+  };
+})();
+
+;(function() {
+  'use strict';
+
+  sigma.utils.pkg('sigma.canvas.edges');
+
+  /**
+   * This edge renderer will display edges as curves with arrow heading.
+   *
+   * @param  {object}                   edge         The edge object.
+   * @param  {object}                   source node  The edge source node.
+   * @param  {object}                   target node  The edge target node.
+   * @param  {CanvasRenderingContext2D} context      The canvas context.
+   * @param  {configurable}             settings     The settings function.
+   */
+  sigma.canvas.edges.curvedArrow =
+    function(edge, source, target, context, settings) {
+    var color = edge.color,
+        prefix = settings('prefix') || '',
+        edgeColor = settings('edgeColor'),
+        defaultNodeColor = settings('defaultNodeColor'),
+        defaultEdgeColor = settings('defaultEdgeColor'),
+        cp = {},
+        size = edge[prefix + 'size'] || 1,
+        tSize = target[prefix + 'size'],
+        sX = source[prefix + 'x'],
+        sY = source[prefix + 'y'],
+        tX = target[prefix + 'x'],
+        tY = target[prefix + 'y'],
+        aSize = Math.max(size * 2.5, settings('minArrowSize')),
+        d,
+        aX,
+        aY,
+        vX,
+        vY;
+
+    cp = (source.id === target.id) ?
+      sigma.utils.getSelfLoopControlPoints(sX, sY, tSize) :
+      sigma.utils.getQuadraticControlPoint(sX, sY, tX, tY, edge.cc);
+
+    if (source.id === target.id) {
+      d = Math.sqrt((tX - cp.x1) * (tX - cp.x1) + (tY - cp.y1) * (tY - cp.y1));
+      aX = cp.x1 + (tX - cp.x1) * (d - aSize - tSize) / d;
+      aY = cp.y1 + (tY - cp.y1) * (d - aSize - tSize) / d;
+      vX = (tX - cp.x1) * aSize / d;
+      vY = (tY - cp.y1) * aSize / d;
+    }
+    else {
+      d = Math.sqrt((tX - cp.x) * (tX - cp.x) + (tY - cp.y) * (tY - cp.y));
+      aX = cp.x + (tX - cp.x) * (d - aSize - tSize) / d;
+      aY = cp.y + (tY - cp.y) * (d - aSize - tSize) / d;
+      vX = (tX - cp.x) * aSize / d;
+      vY = (tY - cp.y) * aSize / d;
+    }
+
+    if (!color)
+      switch (edgeColor) {
+        case 'source':
+          color = source.color || defaultNodeColor;
+          break;
+        case 'target':
+          color = target.color || defaultNodeColor;
+          break;
+        default:
+          color = defaultEdgeColor;
+          break;
+      }
+
+    context.strokeStyle = color;
+    context.lineWidth = size;
+    context.beginPath();
+    context.moveTo(sX, sY);
+    if (source.id === target.id) {
+      context.bezierCurveTo(cp.x2, cp.y2, cp.x1, cp.y1, aX, aY);
+    } else {
+      context.quadraticCurveTo(cp.x, cp.y, aX, aY);
+    }
     context.stroke();
 
     context.fillStyle = color;
@@ -10027,7 +10237,7 @@ if (typeof exports !== 'undefined') {
 
     cp = (source.id === target.id) ?
       sigma.utils.getSelfLoopControlPoints(sX, sY, sSize) :
-      sigma.utils.getQuadraticControlPoint(sX, sY, tX, tY);
+      sigma.utils.getQuadraticControlPoint(sX, sY, tX, tY, edge.cc);
 
     if (!color)
       switch (edgeColor) {
@@ -10091,8 +10301,8 @@ if (typeof exports !== 'undefined') {
 
     size = (edge.hover) ?
       settings('edgeHoverSizeRatio') * size : size;
-    var aSize = size * 2.5,
-        d = Math.sqrt(Math.pow(tX - sX, 2) + Math.pow(tY - sY, 2)),
+    var aSize = Math.max(size * 2.5, settings('minArrowSize')),
+        d = Math.sqrt((tX - sX) * (tX - sX) + (tY - sY) * (tY - sY)),
         aX = sX + (tX - sX) * (d - aSize - tSize) / d,
         aY = sY + (tY - sY) * (d - aSize - tSize) / d,
         vX = (tX - sX) * aSize / d,
@@ -10175,18 +10385,18 @@ if (typeof exports !== 'undefined') {
 
     cp = (source.id === target.id) ?
       sigma.utils.getSelfLoopControlPoints(sX, sY, tSize) :
-      sigma.utils.getQuadraticControlPoint(sX, sY, tX, tY);
+      sigma.utils.getQuadraticControlPoint(sX, sY, tX, tY, edge.cc);
 
     if (source.id === target.id) {
-      d = Math.sqrt(Math.pow(tX - cp.x1, 2) + Math.pow(tY - cp.y1, 2));
-      aSize = size * 2.5;
+      d = Math.sqrt((tX - cp.x1) * (tX - cp.x1) + (tY - cp.y1) * (tY - cp.y1));
+      aSize = Math.max(size * 2.5, settings('minArrowSize'));
       aX = cp.x1 + (tX - cp.x1) * (d - aSize - tSize) / d;
       aY = cp.y1 + (tY - cp.y1) * (d - aSize - tSize) / d;
       vX = (tX - cp.x1) * aSize / d;
       vY = (tY - cp.y1) * aSize / d;
     }
     else {
-      d = Math.sqrt(Math.pow(tX - cp.x, 2) + Math.pow(tY - cp.y, 2));
+      d = Math.sqrt((tX - cp.x) * (tX - cp.x) + (tY - cp.y) * (tY - cp.y));
       aSize = size * 2.5;
       aX = cp.x + (tX - cp.x) * (d - aSize - tSize) / d;
       aY = cp.y + (tY - cp.y) * (d - aSize - tSize) / d;
@@ -10445,7 +10655,7 @@ if (typeof exports !== 'undefined') {
   sigma.utils.pkg('sigma.svg.edges');
 
   /**
-   * The curve edge renderer. It renders the node as a bezier curve.
+   * The curve edge renderer. It renders the edge as a bezier curve.
    */
   sigma.svg.edges.curve = {
 
@@ -10491,26 +10701,135 @@ if (typeof exports !== 'undefined') {
      * SVG Element update.
      *
      * @param  {object}                   edge       The edge object.
-     * @param  {DOMElement}               line       The line DOM Element.
+     * @param  {DOMElement}               path       The path DOM Element.
      * @param  {object}                   source     The source node object.
      * @param  {object}                   target     The target node object.
      * @param  {configurable}             settings   The settings function.
      */
     update: function(edge, path, source, target, settings) {
-      var prefix = settings('prefix') || '';
+      var prefix = settings('prefix') || '',
+          sSize = source[prefix + 'size'],
+          sX = source[prefix + 'x'],
+          sY = source[prefix + 'y'],
+          tX = target[prefix + 'x'],
+          tY = target[prefix + 'y'],
+          cp,
+          p;
 
       path.setAttributeNS(null, 'stroke-width', edge[prefix + 'size'] || 1);
 
-      // Control point
-      var cx = (source[prefix + 'x'] + target[prefix + 'x']) / 2 +
-        (target[prefix + 'y'] - source[prefix + 'y']) / 4,
-          cy = (source[prefix + 'y'] + target[prefix + 'y']) / 2 +
-        (source[prefix + 'x'] - target[prefix + 'x']) / 4;
+      if (source.id === target.id) {
+        cp = sigma.utils.getSelfLoopControlPoints(sX, sY, sSize);
+        // Path
+        p = 'M' + sX + ',' + sY + ' ' +
+            'C' + cp.x1 + ',' + cp.y1 + ' ' +
+            cp.x2 + ',' + cp.y2 + ' ' +
+            tX + ',' + tY;
+      }
+      else {
+        cp = sigma.utils.getQuadraticControlPoint(sX, sY, tX, tY, edge.cc);
+        // Path
+        p = 'M' + sX + ',' + sY + ' ' +
+            'Q' + cp.x + ',' + cp.y + ' ' +
+            tX + ',' + tY;
+      }
 
-      // Path
-      var p = 'M' + source[prefix + 'x'] + ',' + source[prefix + 'y'] + ' ' +
-              'Q' + cx + ',' + cy + ' ' +
-              target[prefix + 'x'] + ',' + target[prefix + 'y'];
+      // Updating attributes
+      path.setAttributeNS(null, 'd', p);
+      path.setAttributeNS(null, 'fill', 'none');
+
+      // Showing
+      path.style.display = '';
+
+      return this;
+    }
+  };
+})();
+
+;(function() {
+  'use strict';
+
+  sigma.utils.pkg('sigma.svg.edges');
+
+  /**
+   * TODO add arrow
+   */
+  sigma.svg.edges.curvedArrow = {
+
+    /**
+     * SVG Element creation.
+     *
+     * @param  {object}                   edge       The edge object.
+     * @param  {object}                   source     The source node object.
+     * @param  {object}                   target     The target node object.
+     * @param  {configurable}             settings   The settings function.
+     */
+    create: function(edge, source, target, settings) {
+      var color = edge.color,
+          prefix = settings('prefix') || '',
+          edgeColor = settings('edgeColor'),
+          defaultNodeColor = settings('defaultNodeColor'),
+          defaultEdgeColor = settings('defaultEdgeColor');
+
+      if (!color)
+        switch (edgeColor) {
+          case 'source':
+            color = source.color || defaultNodeColor;
+            break;
+          case 'target':
+            color = target.color || defaultNodeColor;
+            break;
+          default:
+            color = defaultEdgeColor;
+            break;
+        }
+
+      var path = document.createElementNS(settings('xmlns'), 'path');
+
+      // Attributes
+      path.setAttributeNS(null, 'data-edge-id', edge.id);
+      path.setAttributeNS(null, 'class', settings('classPrefix') + '-edge');
+      path.setAttributeNS(null, 'stroke', color);
+
+      return path;
+    },
+
+    /**
+     * SVG Element update.
+     *
+     * @param  {object}                   edge       The edge object.
+     * @param  {DOMElement}               path       The path DOM Element.
+     * @param  {object}                   source     The source node object.
+     * @param  {object}                   target     The target node object.
+     * @param  {configurable}             settings   The settings function.
+     */
+    update: function(edge, path, source, target, settings) {
+      var prefix = settings('prefix') || '',
+          sSize = source[prefix + 'size'],
+          sX = source[prefix + 'x'],
+          sY = source[prefix + 'y'],
+          tX = target[prefix + 'x'],
+          tY = target[prefix + 'y'],
+          cp,
+          p;
+
+      path.setAttributeNS(null, 'stroke-width', edge[prefix + 'size'] || 1);
+
+      if (source.id === target.id) {
+        cp = sigma.utils.getSelfLoopControlPoints(sX, sY, sSize);
+        // Path
+        p = 'M' + sX + ',' + sY + ' ' +
+            'C' + cp.x1 + ',' + cp.y1 + ' ' +
+            cp.x2 + ',' + cp.y2 + ' ' +
+            tX + ',' + tY;
+      }
+      else {
+        cp = sigma.utils.getQuadraticControlPoint(sX, sY, tX, tY, edge.cc);
+        // Path
+        p = 'M' + sX + ',' + sY + ' ' +
+            'Q' + cp.x + ',' + cp.y + ' ' +
+            tX + ',' + tY;
+      }
 
       // Updating attributes
       path.setAttributeNS(null, 'd', p);
@@ -10788,50 +11107,52 @@ if (typeof exports !== 'undefined') {
         ns = ~rescaleSettings.indexOf('nodeSize'),
         es = ~rescaleSettings.indexOf('edgeSize');
 
-    /**
-     * First, we compute the scaling ratio, without considering the sizes
-     * of the nodes : Each node will have its center in the canvas, but might
-     * be partially out of it.
-     */
-    scale = settings('scalingMode') === 'outside' ?
-      Math.max(
-        w / Math.max(maxX - minX, 1),
-        h / Math.max(maxY - minY, 1)
-      ) :
-      Math.min(
-        w / Math.max(maxX - minX, 1),
-        h / Math.max(maxY - minY, 1)
-      );
+    if (np) {
+      /**
+       * First, we compute the scaling ratio, without considering the sizes
+       * of the nodes : Each node will have its center in the canvas, but might
+       * be partially out of it.
+       */
+      scale = settings('scalingMode') === 'outside' ?
+        Math.max(
+          w / Math.max(maxX - minX, 1),
+          h / Math.max(maxY - minY, 1)
+        ) :
+        Math.min(
+          w / Math.max(maxX - minX, 1),
+          h / Math.max(maxY - minY, 1)
+        );
 
-    /**
-     * Then, we correct that scaling ratio considering a margin, which is
-     * basically the size of the biggest node.
-     * This has to be done as a correction since to compare the size of the
-     * biggest node to the X and Y values, we have to first get an
-     * approximation of the scaling ratio.
-     **/
-    margin =
-      (
-        settings('rescaleIgnoreSize') ?
-          0 :
-          (settings('maxNodeSize') || sizeMax) / scale
-      ) +
-      (settings('sideMargin') || 0);
-    maxX += margin;
-    minX -= margin;
-    maxY += margin;
-    minY -= margin;
+      /**
+       * Then, we correct that scaling ratio considering a margin, which is
+       * basically the size of the biggest node.
+       * This has to be done as a correction since to compare the size of the
+       * biggest node to the X and Y values, we have to first get an
+       * approximation of the scaling ratio.
+       **/
+      margin =
+        (
+          settings('rescaleIgnoreSize') ?
+            0 :
+            (settings('maxNodeSize') || sizeMax) / scale
+        ) +
+        (settings('sideMargin') || 0);
+      maxX += margin;
+      minX -= margin;
+      maxY += margin;
+      minY -= margin;
 
-    // Fix the scaling with the new extrema:
-    scale = settings('scalingMode') === 'outside' ?
-      Math.max(
-        w / Math.max(maxX - minX, 1),
-        h / Math.max(maxY - minY, 1)
-      ) :
-      Math.min(
-        w / Math.max(maxX - minX, 1),
-        h / Math.max(maxY - minY, 1)
-      );
+      // Fix the scaling with the new extrema:
+      scale = settings('scalingMode') === 'outside' ?
+        Math.max(
+          w / Math.max(maxX - minX, 1),
+          h / Math.max(maxY - minY, 1)
+        ) :
+        Math.min(
+          w / Math.max(maxX - minX, 1),
+          h / Math.max(maxY - minY, 1)
+        );
+    }
 
     // Size homothetic parameters:
     if (!settings('maxNodeSize') && !settings('minNodeSize')) {
@@ -10864,10 +11185,17 @@ if (typeof exports !== 'undefined') {
     for (i = 0, l = n.length; i < l; i++) {
       n[i][writePrefix + 'size'] =
         n[i][readPrefix + 'size'] * (ns ? a : 1) + (ns ? b : 0);
-      n[i][writePrefix + 'x'] =
-        (n[i][readPrefix + 'x'] - (maxX + minX) / 2) * (np ? scale : 1);
-      n[i][writePrefix + 'y'] =
-        (n[i][readPrefix + 'y'] - (maxY + minY) / 2) * (np ? scale : 1);
+
+      if (np) {
+        n[i][writePrefix + 'x'] =
+          (n[i][readPrefix + 'x'] - (maxX + minX) / 2) * scale;
+        n[i][writePrefix + 'y'] =
+          (n[i][readPrefix + 'y'] - (maxY + minY) / 2) * scale;
+      }
+      else {
+        n[i][writePrefix + 'x'] = n[i][readPrefix + 'x'];
+        n[i][writePrefix + 'y'] = n[i][readPrefix + 'y'];
+      }
     }
   };
 
@@ -11249,8 +11577,8 @@ if (typeof exports !== 'undefined') {
             modifiedY > y - s &&
             modifiedY < y + s &&
             Math.sqrt(
-              Math.pow(modifiedX - x, 2) +
-              Math.pow(modifiedY - y, 2)
+              (modifiedX - x) * (modifiedX - x) +
+              (modifiedY - y) * (modifiedY - y)
             ) < s
           ) {
             // Insert the node:
@@ -11405,7 +11733,8 @@ if (typeof exports !== 'undefined') {
                   source[prefix + 'x'],
                   source[prefix + 'y'],
                   target[prefix + 'x'],
-                  target[prefix + 'y']);
+                  target[prefix + 'y'],
+                  edge.cc);
                 if (
                   sigma.utils.isPointOnQuadraticCurve(
                   modifiedX,
@@ -11544,40 +11873,26 @@ if (typeof exports !== 'undefined') {
           return;
 
         var k,
-            i,
-            l,
-            le,
-            outNodes = [],
-            outEdges = [];
+            event = {
+              current: { nodes: [], edges: [], },
+              enter: { nodes: [], edges: [], },
+              leave: { nodes: [], edges: [], },
+              captor: e.data
+            },
+            leave = event.leave;
 
         for (k in overNodes)
-          outNodes.push(overNodes[k]);
+          leave.nodes.push(overNodes[k]);
+
+        for (k in overEdges)
+          leave.edges.push(overEdges[k]);
 
         overNodes = {};
-        // Dispatch both single and multi events:
-        for (i = 0, l = outNodes.length; i < l; i++)
-          self.dispatchEvent('outNode', {
-            node: outNodes[i],
-            captor: e.data
-          });
-        if (outNodes.length)
-          self.dispatchEvent('outNodes', {
-            nodes: outNodes,
-            captor: e.data
-          });
-
         overEdges = {};
-        // Dispatch both single and multi events:
-        for (i = 0, le = outEdges.length; i < le; i++)
-          self.dispatchEvent('outEdge', {
-            edge: outEdges[i],
-            captor: e.data
-          });
-        if (outEdges.length)
-          self.dispatchEvent('outEdges', {
-            edges: outEdges,
-            captor: e.data
-          });
+
+        if (leave.nodes.length || leave.edges.length) {
+          self.dispatchEvent('hovers', event);
+        }
       }
 
       function onMove(e) {
@@ -11594,14 +11909,12 @@ if (typeof exports !== 'undefined') {
             newOutNodes = [],
             newOverNodes = [],
             currentOverNodes = {},
-            l = nodes.length,
             newOutEdges = [],
             newOverEdges = [],
-            currentOverEdges = {},
-            le = edges.length;
+            currentOverEdges = {};
 
         // Check newly overred nodes:
-        for (i = 0; i < l; i++) {
+        for (i = 0; i < nodes.length; i++) {
           node = nodes[i];
           currentOverNodes[node.id] = node;
           if (!overNodes[node.id]) {
@@ -11617,30 +11930,8 @@ if (typeof exports !== 'undefined') {
             delete overNodes[k];
           }
 
-        // Dispatch both single and multi events:
-        for (i = 0, l = newOverNodes.length; i < l; i++)
-          self.dispatchEvent('overNode', {
-            node: newOverNodes[i],
-            captor: e.data
-          });
-        for (i = 0, l = newOutNodes.length; i < l; i++)
-          self.dispatchEvent('outNode', {
-            node: newOutNodes[i],
-            captor: e.data
-          });
-        if (newOverNodes.length)
-          self.dispatchEvent('overNodes', {
-            nodes: newOverNodes,
-            captor: e.data
-          });
-        if (newOutNodes.length)
-          self.dispatchEvent('outNodes', {
-            nodes: newOutNodes,
-            captor: e.data
-          });
-
         // Check newly overred edges:
-        for (i = 0; i < le; i++) {
+        for (i = 0; i < edges.length; i++) {
           edge = edges[i];
           currentOverEdges[edge.id] = edge;
           if (!overEdges[edge.id]) {
@@ -11656,27 +11947,24 @@ if (typeof exports !== 'undefined') {
             delete overEdges[k];
           }
 
-        // Dispatch both single and multi events:
-        for (i = 0, le = newOverEdges.length; i < le; i++)
-          self.dispatchEvent('overEdge', {
-            edge: newOverEdges[i],
+        if (newOutEdges.length || newOverEdges.length ||
+             newOutNodes.length || newOverNodes.length) {
+          self.dispatchEvent('hovers', {
+            current: {
+              nodes: nodes,
+              edges: edges,
+            },
+            enter: {
+              nodes: newOverNodes,
+              edges: newOverEdges,
+            },
+            leave: {
+              nodes: newOutNodes,
+              edges: newOutEdges,
+            },
             captor: e.data
           });
-        for (i = 0, le = newOutEdges.length; i < le; i++)
-          self.dispatchEvent('outEdge', {
-            edge: newOutEdges[i],
-            captor: e.data
-          });
-        if (newOverEdges.length)
-          self.dispatchEvent('overEdges', {
-            edges: newOverEdges,
-            captor: e.data
-          });
-        if (newOutEdges.length)
-          self.dispatchEvent('outEdges', {
-            edges: newOutEdges,
-            captor: e.data
-          });
+        }
       }
 
       // Bind events:
@@ -11687,7 +11975,6 @@ if (typeof exports !== 'undefined') {
       captor.bind('mouseout', onOut);
       captor.bind('doubleclick', onDoubleClick);
       captor.bind('rightclick', onRightClick);
-      self.bind('render', onMove);
     }
 
     for (i = 0, l = this.captors.length; i < l; i++)
@@ -11713,7 +12000,8 @@ if (typeof exports !== 'undefined') {
    */
   sigma.misc.bindDOMEvents = function(container) {
     var self = this,
-        graph = this.graph;
+        graph = this.graph,
+        hovered = {nodes: [], edges: []};
 
     // DOMElement abstraction
     function Element(domElement) {
@@ -11748,7 +12036,7 @@ if (typeof exports !== 'undefined') {
         return;
 
       // Generic event
-      self.dispatchEvent('click', e);
+      self.dispatchEvent('click', sigma.utils.mouseCoords(e));
 
       // Are we on a node?
       var element = new Element(e.target);
@@ -11770,7 +12058,7 @@ if (typeof exports !== 'undefined') {
         return;
 
       // Generic event
-      self.dispatchEvent('doubleClick', e);
+      self.dispatchEvent('doubleClick', sigma.utils.mouseCoords(e));
 
       // Are we on a node?
       var element = new Element(e.target);
@@ -11793,21 +12081,26 @@ if (typeof exports !== 'undefined') {
       if (!self.settings('eventsEnabled') || !target)
         return;
 
-      var el = new Element(target);
+      var el_svg = new Element(target),
+        event = {
+          leave: {nodes: [], edges: []},
+          enter: {nodes: [], edges: []},
+          captor: sigma.utils.mouseCoords(e),
+        },
+        el;
 
-      if (el.isNode()) {
-        self.dispatchEvent('overNode', {
-          node: graph.nodes(el.attr('data-node-id'))
-        });
+      if (el_svg.isNode()) {
+        el = graph.nodes(el_svg.attr('data-node-id'));
+        event.enter.nodes = [el];
+        hovered.nodes.push(el);
+      } else if (el_svg.isEdge()) {
+        el = graph.edges(el_svg.attr('data-edge-id'));
+        event.enter.edges = [el];
+        hovered.edges.push(el);
       }
-      else if (el.isEdge()) {
-        var edge = graph.edges(el.attr('data-edge-id'));
-        self.dispatchEvent('overEdge', {
-          edge: edge,
-          source: graph.nodes(edge.source),
-          target: graph.nodes(edge.target)
-        });
-      }
+
+      event.current = hovered;
+      self.dispatchEvent('hovers', event);
     }
 
     // On out
@@ -11817,21 +12110,28 @@ if (typeof exports !== 'undefined') {
       if (!self.settings('eventsEnabled'))
         return;
 
-      var el = new Element(target);
+      var el_svg = new Element(target),
+        event = {
+          leave: {nodes: [], edges: []},
+          enter: {nodes: [], edges: []},
+          captor: sigma.utils.mouseCoords(e),
+        },
+        el;
 
-      if (el.isNode()) {
-        self.dispatchEvent('outNode', {
-          node: graph.nodes(el.attr('data-node-id'))
-        });
+      if (el_svg.isNode()) {
+        el = graph.nodes(el_svg.attr('data-node-id'));
+        event.leave.nodes = [el];
+        hovered.nodes.push(el);
+      } else if (el_svg.isEdge()) {
+        el = graph.edges(el_svg.attr('data-edge-id'));
+        event.leave.edges = [el];
+        hovered.edges.push(el);
+      } else {
+        return;
       }
-      else if (el.isEdge()) {
-        var edge = graph.edges(el.attr('data-edge-id'));
-        self.dispatchEvent('outEdge', {
-          edge: edge,
-          source: graph.nodes(edge.source),
-          target: graph.nodes(edge.target)
-        });
-      }
+
+      event.current = hovered;
+      self.dispatchEvent('hovers', event);
     }
 
     // Registering Events:
@@ -11862,8 +12162,8 @@ if (typeof exports !== 'undefined') {
   sigma.utils.pkg('sigma.misc');
 
   /**
-   * This method listens to "overNode", "outNode", "overEdge" and "outEdge"
-   * events from a renderer and renders the nodes differently on the top layer.
+   * This method listens to "hovers" events from a renderer and renders
+   * the nodes differently on the top layer.
    * The goal is to make any node label readable with the mouse, and to
    * highlight hovered nodes and edges.
    *
@@ -11871,32 +12171,10 @@ if (typeof exports !== 'undefined') {
    */
   sigma.misc.drawHovers = function(prefix) {
     var self = this,
-        hoveredNodes = {},
-        hoveredEdges = {};
+        current = {nodes: [], edges: []};
 
-    this.bind('overNode', function(event) {
-      var node = event.data.node;
-      if (!node.hidden) {
-        hoveredNodes[node.id] = node;
-        draw();
-      }
-    });
-
-    this.bind('outNode', function(event) {
-      delete hoveredNodes[event.data.node.id];
-      draw();
-    });
-
-    this.bind('overEdge', function(event) {
-      var edge = event.data.edge;
-      if (!edge.hidden) {
-        hoveredEdges[edge.id] = edge;
-        draw();
-      }
-    });
-
-    this.bind('outEdge', function(event) {
-      delete hoveredEdges[event.data.edge.id];
+    this.bind('hovers', function(event) {
+      current = event.data.current;
       draw();
     });
 
@@ -11905,170 +12183,44 @@ if (typeof exports !== 'undefined') {
     });
 
     function draw() {
-
-      var k,
-          source,
-          target,
-          hoveredNode,
-          hoveredEdge,
-          c = self.contexts.hover.canvas,
-          defaultNodeType = self.settings('defaultNodeType'),
-          defaultEdgeType = self.settings('defaultEdgeType'),
-          nodeRenderers = sigma.canvas.hovers,
-          edgeRenderers = sigma.canvas.edgehovers,
-          extremitiesRenderers = sigma.canvas.extremities,
+      var c = self.contexts.hover.canvas,
           embedSettings = self.settings.embedObjects({
             prefix: prefix
-          });
+          }),
+          end = embedSettings('singleHover') ? 1 : undefined,
+          renderParams = {
+            elements: current.nodes,
+            renderers: sigma.canvas.hovers,
+            type: 'nodes',
+            ctx: self.contexts.hover,
+            end: end,
+            graph: self.graph,
+            settings: embedSettings,
+          };
 
-      // Clear self.contexts.hover:
       self.contexts.hover.clearRect(0, 0, c.width, c.height);
 
-      // Node render: single hover
-      if (
-        embedSettings('enableHovering') &&
-        embedSettings('singleHover') &&
-        Object.keys(hoveredNodes).length
-      ) {
-        hoveredNode = hoveredNodes[Object.keys(hoveredNodes)[0]];
-        (
-          nodeRenderers[hoveredNode.type] ||
-          nodeRenderers[defaultNodeType] ||
-          nodeRenderers.def
-        )(
-          hoveredNode,
-          self.contexts.hover,
-          embedSettings
-        );
+      // Node render
+      if (current.nodes.length > 0 && embedSettings('enableHovering')) {
+        sigma.renderers.canvas.applyRenderers(renderParams);
       }
 
-      // Node render: multiple hover
-      if (
-        embedSettings('enableHovering') &&
-        !embedSettings('singleHover')
-      )
-        for (k in hoveredNodes)
-          (
-            nodeRenderers[hoveredNodes[k].type] ||
-            nodeRenderers[defaultNodeType] ||
-            nodeRenderers.def
-          )(
-            hoveredNodes[k],
-            self.contexts.hover,
-            embedSettings
-          );
+      // Edge render
+      if (current.edges.length > 0 && embedSettings('enableEdgeHovering')) {
+        renderParams.renderers = sigma.canvas.edgehovers;
+        renderParams.elements = current.edges;
+        renderParams.type = 'edges';
+        sigma.renderers.canvas.applyRenderers(renderParams);
 
-      // Edge render: single hover
-      if (
-        embedSettings('enableEdgeHovering') &&
-        embedSettings('singleHover') &&
-        Object.keys(hoveredEdges).length
-      ) {
-        hoveredEdge = hoveredEdges[Object.keys(hoveredEdges)[0]];
-        source = self.graph.nodes(hoveredEdge.source);
-        target = self.graph.nodes(hoveredEdge.target);
-
-        if (! hoveredEdge.hidden) {
-          (
-            edgeRenderers[hoveredEdge.type] ||
-            edgeRenderers[defaultEdgeType] ||
-            edgeRenderers.def
-          ) (
-            hoveredEdge,
-            source,
-            target,
-            self.contexts.hover,
-            embedSettings
-          );
-
-          if (embedSettings('edgeHoverExtremities')) {
-            (
-              extremitiesRenderers[hoveredEdge.type] ||
-              extremitiesRenderers.def
-            )(
-              hoveredEdge,
-              source,
-              target,
-              self.contexts.hover,
-              embedSettings
-            );
-
-          } else {
-            // Avoid edges rendered over nodes:
-            (
-              sigma.canvas.nodes[source.type] ||
-              sigma.canvas.nodes.def
-            ) (
-              source,
-              self.contexts.hover,
-              embedSettings
-            );
-            (
-              sigma.canvas.nodes[target.type] ||
-              sigma.canvas.nodes.def
-            ) (
-              target,
-              self.contexts.hover,
-              embedSettings
-            );
-          }
-        }
-      }
-
-      // Edge render: multiple hover
-      if (
-        embedSettings('enableEdgeHovering') &&
-        !embedSettings('singleHover')
-      ) {
-        for (k in hoveredEdges) {
-          hoveredEdge = hoveredEdges[k];
-          source = self.graph.nodes(hoveredEdge.source);
-          target = self.graph.nodes(hoveredEdge.target);
-
-          if (!hoveredEdge.hidden) {
-            (
-              edgeRenderers[hoveredEdge.type] ||
-              edgeRenderers[defaultEdgeType] ||
-              edgeRenderers.def
-            ) (
-              hoveredEdge,
-              source,
-              target,
-              self.contexts.hover,
-              embedSettings
-            );
-
-            if (embedSettings('edgeHoverExtremities')) {
-              (
-                extremitiesRenderers[hoveredEdge.type] ||
-                extremitiesRenderers.def
-              )(
-                hoveredEdge,
-                source,
-                target,
-                self.contexts.hover,
-                embedSettings
-              );
-            } else {
-              // Avoid edges rendered over nodes:
-              (
-                sigma.canvas.nodes[source.type] ||
-                sigma.canvas.nodes.def
-              ) (
-                source,
-                self.contexts.hover,
-                embedSettings
-              );
-              (
-                sigma.canvas.nodes[target.type] ||
-                sigma.canvas.nodes.def
-              ) (
-                target,
-                self.contexts.hover,
-                embedSettings
-              );
-            }
-          }
+        if (embedSettings('edgeHoverExtremities')) {
+          renderParams.renderers = sigma.canvas.extremities;
+          sigma.renderers.canvas.applyRenderers(renderParams);
+        } else { //draw nodes over edges
+          renderParams.ctx = self.contexts.nodes;
+          renderParams.type = 'nodes';
+          renderParams.renderers = sigma.canvas.nodes;
+          renderParams.elements = current.nodes;
+          sigma.renderers.canvas.applyRenderers(renderParams);
         }
       }
     }
