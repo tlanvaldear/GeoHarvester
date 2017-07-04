@@ -1,18 +1,5 @@
-//TODO:Make JSONfile out of it
-// #ff6666 NEW - #b5c2ec NONEXISTANT
+// #ff6666 NEW - #b5c2ec NOMOREEXISTANT
 
-//IF YOU ADDDED A BUTTON PLEASE CREATE A NEW LINE FOR THE QUERY
-// YOU CAN USE THE BASIC QUERIES THAT ARE ALREADY WRITTEN - JUST
-// REMEMBER TO REPLACE THE LAST FOUR LETTERS OF THE NODELABEL TO YOUR
-// NEW LABEL'S ONE.
-var queries = {
-  "2015": "MATCH (n:Node2015) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
-  "2017": "MATCH (n:Node2017) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
-  "Oall": "MATCH (n:NodeOall) OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m",
-};
-var pwd = 'tv38çqPL';
-var login = 'neo4j';
-var connect = 'http://0.0.0.0:7474';
 var xKeep = {};
 var yKeep = {};
 var cont = [];
@@ -20,6 +7,19 @@ var ids = {};
 var deflab = {};
 var cbmode = false;
 var desc = true; // will check if useful
+var queries = {};
+var pwd = 'tv38çqPL';
+var login = 'neo4j';
+var connect = 'http://0.0.0.0:7474';
+sigma.neo4j.getLabels(
+    { url: connect, user:login, password:pwd },
+    function(labels) {
+        labels.forEach(function(label){
+            queries[label] = "MATCH (n:"+label+") OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m"
+        });
+    }
+);
+
 
 function progressive(){
   console.log("progressive")
@@ -137,25 +137,34 @@ function cbmode_e(){
 }
 function query(label){
   console.log("query")
-  if (deflab[label] == "true" && document.getElementById('sigma-container-'+label).style.display == 'block'){
-    document.getElementById('sigma-container-'+label).style.display = 'none';
+  if (deflab[label] == "true" && document.getElementById('sigma-container-'+label.slice(-4)).style.display == 'block'){
+    document.getElementById('sigma-container-'+label.slice(-4)).style.display = 'none';
     return;
   }
   if (!deflab[label]){
       var s = new sigma({
-  renderer: {
-    container: document.getElementById('sigma-container-'+label),
-    type: 'canvas'
-}});
+        renderer: {
+          container: document.getElementById('sigma-container-'+label.slice(-4)),
+          type: 'canvas'
+        }});
   sigma.neo4j.cypher(
   { url: connect, user: login, password: pwd },
-  queries[label], //check for any possibility to use cypher.getLabels in order to get a full queries json object. Can easily be done in Python, though
+  queries[label],
   s,
     function(s){
+      try{
       cont[cont.length] = s;
       cont[cont.length-1].l = label;
       cont[cont.length-1].explored = false;
       graphstart(s);
+    }
+    catch(e){
+      if (e instanceof TypeError){
+        console.log("hi")
+        deflab = {}
+        query(label)
+      }
+    }
     });
     deflab[label] = "true";
   }
@@ -168,7 +177,7 @@ function query(label){
         }, 5000);
   }
   });
-  document.getElementById('sigma-container-'+label).style.display = 'block';
+  document.getElementById('sigma-container-'+label.slice(-4)).style.display = 'block';
 }
 function graphstart(s) {
   console.log("Graphstart")
@@ -335,15 +344,3 @@ sigma.classes.graph.addMethod('neighbors', function(nodeId) {
             }
         return neighbors;
 });
-
-// Calling neo4j to get all its node label
-// TODO: find a way to get queries(label) working on this one...
-// Currently leads to sigma error 'data property on undefined'...
-sigma.neo4j.getLabels(
-    { url: connect, user:login, password:pwd },
-    function(labels) {
-        labels.forEach(function(label){
-            queries[label] = "MATCH (n:"+label+") OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m"
-        });
-    }
-);

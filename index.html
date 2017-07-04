@@ -35,9 +35,9 @@
 <body>
     <!--BUTTONS TO LOAD DATA / IN ORDER TO ADD SOME REMEMBER TO FIRST ADD IT TO DATABASE AND -->
     <div>
-        <button class="btn btn-primary" type="button" onclick="query('2015')">2015</button>
-        <button class="btn btn-primary" type="button" onclick="query('2017')">2017</button>
-        <button class="btn btn-primary" type="button" onclick="query('Oall')">Fusion</button>
+        <button class="btn btn-primary" type="button" onclick="query('Node2015')">2015</button>
+        <button class="btn btn-primary" type="button" onclick="query('Node2017')">2017</button>
+        <button class="btn btn-primary" type="button" onclick="query('NodeOall')">Fusion</button>
         <button class="btn btn-primary" type="button" onclick="cbmode_e()">Mode sans couleur</button>
         <button class="btn btn-primary" type="button" onclick="progressive()">Affichage progressif des différences</button>
         <input type="text" id="gisearch" onkeyup="search_s()" placeholder="Rechercher un SIG...">
@@ -60,6 +60,8 @@
 <!-- SIGMA APP IMPORT -->
 <script src="js/index.js"></script>
 <!-- APP INITIALISATION -->
-<script>window.onload = query('Oall');</script>
+<script>setTimeout( function(){
+    query("NodeOall")
+}, 500);</script>
 </body>
 </html>
