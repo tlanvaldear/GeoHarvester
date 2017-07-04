@@ -39,13 +39,14 @@
         <button class="btn btn-primary" type="button" onclick="query('2017')">2017</button>
         <button class="btn btn-primary" type="button" onclick="query('Oall')">Fusion</button>
         <button class="btn btn-primary" type="button" onclick="cbmode_e()">Mode sans couleur</button>
-        <button class="btn btn-primary" type="button" onclick="progressive()">Progression des différences</button>
+        <button class="btn btn-primary" type="button" onclick="progressive()">Affichage progressif des différences</button>
         <input type="text" id="gisearch" onkeyup="search_s()" placeholder="Rechercher un SIG...">
     </div>
     <!-- ADD A DIV TOO IN ORDER TO STOCK ITS CANVAS INTO THE VISUALIZATION TOOL UPON CLICK -->
 <div class="sigma" id="sigma-container-2015"><div class="bg">2015</div></div>
 <div class="sigma" id="sigma-container-2017"><div class="bg">2017</div></div>
 <div class="sigma" id="sigma-container-Oall"><div class="bg">Fusion</div></div>
+<!-- TODO: replace text with structured image system -->
 <br/> Légende : <font size="2">Pour le graphe Fusion / Les couleurs correspondent au texte affiché. Le texte correspond au mode sans couleur </font><p class="past">Arête en tirets et Noeuds carrés: - N'existe plus</p><p class="now">Arête en pointillés et Noeuds en diamant: Est arrivé cette année</p><p class="no">Reste: Inchangé </p> <font size="2"> Pour voir les pointes des arêtes spéciales (non-existantes ou récentes), ouvrez le graphe correspondant.</font>
 <!-- SIGMA IMPORT -->
 <script src="js/sigma.js"></script>

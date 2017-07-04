@@ -19,16 +19,22 @@ var cont = [];
 var ids = {};
 var deflab = {};
 var cbmode = false;
+var desc = true; // will check if useful
 
 function progressive(){
+  console.log("progressive")
     var hide = []; //hidden nodes
     var hide2 = []; // in order to sort by 2015 > 2017 quick
     var hidedges = [];
     var showedges = [];
     var i = 0;
     var sinstance;
+    var div;
     cont.forEach(function(si){
         if (si.l == "Oall"){
+            div = document.getElementById(si.renderers[0].container.id);
+            div.style.height = "80%";
+            div.style.width = "80%";
             sinstance = si;
             si.graph.nodes().forEach(function(n){
                 if (n.neo4j_data['year'] == "2015"){
@@ -80,10 +86,15 @@ function progressive(){
                 sinstance.refresh();
             }, 3000);
         });
+    setTimeout(function(){
+      div.style.height = "50%";
+      div.style.width = "50%";
+      sinstance.refresh();
+    }, 5000);
 };
 
 function search_s(){
-  console.log("hi")
+  console.log("search_s");
   var input = document.getElementById("gisearch");
   var ncs = input.value.toUpperCase();
   var focus = null;
@@ -109,6 +120,7 @@ function search_s(){
 }
 
 function cbmode_e(){
+  console.log("cbmode_e")
     cbmode = !cbmode;
     cont.forEach(function(si){
         if (deflab[si.l] == "true" && document.getElementById('sigma-container-'+si.l).style.display == 'none'){
@@ -124,6 +136,7 @@ function cbmode_e(){
     query('Oall');
 }
 function query(label){
+  console.log("query")
   if (deflab[label] == "true" && document.getElementById('sigma-container-'+label).style.display == 'block'){
     document.getElementById('sigma-container-'+label).style.display = 'none';
     return;
@@ -151,12 +164,14 @@ function query(label){
           si.startForceAtlas2();
           setTimeout( function(){
               si.stopForceAtlas2();
+              si.startNoverlap();
         }, 5000);
   }
   });
   document.getElementById('sigma-container-'+label).style.display = 'block';
 }
 function graphstart(s) {
+  console.log("Graphstart")
 //Params for Directed graph
 s.settings('defaultEdgeType', 'arrow');
 s.settings('minArrowSize', 10);
@@ -207,6 +222,9 @@ var focus;
             e.type = 'dotted';
             e.color = '#ff6666';
         }
+      }
+      else {
+        e.type = 'arrow';
       }
     e.originalColor = e.color;
   });
@@ -300,7 +318,7 @@ var focus;
 sigma.classes.graph.addMethod('neighbors', function(nodeId) {
 var k,
     neighbors = {},
-    index = this.outNeighborsIndex[nodeId] || {};
+    index = desc?this.outNeighborsIndex[nodeId] || {}:this.allNeighborsIndex[nodeId] || {};
 
 for (k in index)
   neighbors[k] = this.nodesIndex[k];
