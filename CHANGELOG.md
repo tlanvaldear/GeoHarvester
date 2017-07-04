@@ -84,4 +84,27 @@
 >
 > Added ideas from 06/28 into *ideas.md*
 >
-> 
+>
+
+
+## 07/04 -
+> Replaced Sigma.js by its fork, Linkurious.
+>> Fixed "CurvedArrow" issue.
+>
+> Fixed various compatibility issues between Sigma and Linkurious.
+>
+> Replaced the `queries` json var by a fully serialized var given by the getLabels method.
+>
+> Removed labels from nodes on layout
+>> Will create a button in order to get this toggleable by the client
+>
+> **TODO** Set nodeLabel threshold to different values
+>> Or create something that checks that labels don't overlap...
+>
+> Changed timeouts on `progressive()` in order to show the differences in a bigger timelapse.
+>
+> Check if it's better to hide than recolor nodes that aren't on the selected node's subgraph.
+>
+> check for a Share Camera system
+>
+> Changed force layout to Fruchterman-Reingold Algorithm's.
