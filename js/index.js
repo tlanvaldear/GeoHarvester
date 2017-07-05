@@ -6,7 +6,7 @@ var cont = [];
 var ids = {};
 var deflab = {};
 var cbmode = false;
-var desc = true; // will check if useful
+var showlabels = document.getElementById("labelsh").checked; // will check if useful
 var queries = {};
 var pwd = 'tv38çqPL';
 var login = 'neo4j';
@@ -22,7 +22,13 @@ sigma.neo4j.getLabels(
     }
 );
 
-
+function showhide(){
+  console.log('showlabels: '+showlabels);
+  cont.forEach(function(si){
+    si.settings('drawLabels',showlabels?true:false);
+    si.refresh();
+  });
+}
 function progressive(){
   console.log("progressive")
     var hide = []; //hidden nodes
@@ -194,7 +200,7 @@ function graphstart(s) {
 //Params for Directed graph
 s.settings('defaultEdgeType', 'curvedArrow');
 s.settings('minArrowSize', 10);
-s.settings('drawLabels',false);
+s.settings('drawLabels',showlabels?true:false);
 //Camera for recentering on node after click
 s.addCamera('cam0');
 var listener = s.configNoverlap({nodeMargin: 1.5, scaleNodes: 1.05, gridSize: 75, duration: 1});
