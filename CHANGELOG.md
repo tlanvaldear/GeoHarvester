@@ -108,3 +108,15 @@
 > check for a Share Camera system
 >
 > Changed force layout to Fruchterman-Reingold Algorithm's.
+
+## 07/05 -
+> Created show/hide system on nodes *see __07/04__*
+>
+> Implemented toggle system on labels *see __07/04__*
+>
+> Corrected display issue on hidden-loaded graphs
+>> If you loaded a hidden graph while having clicked on a node on another graph during its hidden time it wouldnt show anything.
+>
+> Denied **07/04**'s ShareCamera system - see ideas.md
+>
+> Starting another visual App.
