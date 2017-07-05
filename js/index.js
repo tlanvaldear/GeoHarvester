@@ -99,7 +99,6 @@ function search_s(){
   console.log("search_s");
   var input = document.getElementById("gisearch");
   var ncs = input.value.toUpperCase();
-  console.log(ncs)
   var focus = null;
   cont.forEach(function(si){
     if (si.l == "NodeOall"){
@@ -160,22 +159,22 @@ function query(label){
       cont[cont.length-1].l = label;
       cont[cont.length-1].explored = false;
       var frListener = sigma.layouts.fruchtermanReingold.configure(s, {
-  iterations: 500,
-  easing: 'quadraticInOut',
-  duration: 800
-});
-// Bind the events:
-frListener.bind('start stop interpolate', function(e) {
-  console.log(e.type);
-});
-// Start the Fruchterman-Reingold algorithm:
-sigma.layouts.fruchtermanReingold.start(s);
+        iterations: 500,
+        easing: 'quadraticInOut',
+        duration: 800
+      });
+      // Bind the events:
+      frListener.bind('start stop interpolate', function(e) {
+        console.log(e.type);
+      });
+      // Start the Fruchterman-Reingold algorithm:
+      sigma.layouts.fruchtermanReingold.start(s);
 
       graphstart(s);
     }
     catch(e){
       if (e instanceof TypeError){
-        console.log("hi")
+        alert("JavaScript encountered a TypeError. Resetting everything and requerying...")
         deflab = {}
         query(label)
       }
@@ -183,16 +182,12 @@ sigma.layouts.fruchtermanReingold.start(s);
     });
     deflab[label] = "true";
   }
-  // cont.forEach(function(si){
-  //     if (!si.isForceAtlas2Running() && document.getElementById(si.renderers[0].container.id).style.display != 'block'){
-  //         si.startForceAtlas2();
-  //         setTimeout( function(){
-  //             si.stopForceAtlas2();
-  //             si.startNoverlap();
-  //       }, 5000);
-  // }
-  // });
   document.getElementById('sigma-container-'+label.slice(-4)).style.display = 'block';
+  cont.forEach(function(si){
+    if (si.l == label){
+      sigma.layouts.fruchtermanReingold.start(si);
+    }
+  })
 }
 function graphstart(s) {
   console.log("Graphstart")
