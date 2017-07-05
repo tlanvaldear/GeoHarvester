@@ -8,6 +8,21 @@
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <!-- END OF REMOVABLE CONTENT -->
+<!-- SIGMA IMPORT -->
+<script src="js/sigma.js"></script>
+<script src="plugins/sigma.parsers.json.min.js"></script>
+<script src="plugins/sigma.neo4j.cypher.min.js"></script>
+<script src="plugins/sigma.layouts.forceAtlas2.min.js"></script>
+<script src="plugins/sigma.layouts.fruchtermanReingold.min.js"></script>
+<script src="plugins/sigma.layout.noverlap.min.js"></script>
+<script src="plugins/sigma.plugins.animate.min.js"></script>
+<script src="plugins/sigma.renderers.customEdgeShapes.min.js"></script>
+<script src="plugins/sigma.renderers.customShapes.min.js"></script>
+<script src="plugins/sigma.plugins.colorbrewer.min.js"></script>
+<script src="plugins/sigma.plugins.design.min.js"></script>
+<script src="plugins/sigma.plugins.legend.min.js"></script>
+<script src="plugins/sigma.exporters.image.min.js"></script>
+<!-- END -->
 <style type="text/css">
 
         .sigma {
@@ -16,6 +31,10 @@
             float:left;
             border-style: solid;
             display: none;
+        }
+        #sigma-container-oall {
+          width: 80%;
+          height: 80%;
         }
         .bg {
             position:absolute;
@@ -49,17 +68,7 @@
 <div class="sigma" id="sigma-container-2017"><div class="bg">2017</div></div>
 <div class="sigma" id="sigma-container-Oall"><div class="bg">Fusion</div></div>
 <!-- TODO: replace text with structured image system -->
-<br/> Légende : <font size="2">Pour le graphe Fusion / Les couleurs correspondent au texte affiché. Le texte correspond au mode sans couleur </font><p class="past">Arête en tirets et Noeuds carrés: - N'existe plus</p><p class="now">Arête en pointillés et Noeuds en diamant: Est arrivé cette année</p><p class="no">Reste: Inchangé </p> <font size="2"> Pour voir les pointes des arêtes spéciales (non-existantes ou récentes), ouvrez le graphe correspondant.</font>
-<!-- SIGMA IMPORT -->
-<script src="js/sigma.js"></script>
-<script src="plugins/sigma.parsers.json.min.js"></script>
-<script src="plugins/sigma.neo4j.cypher.min.js"></script>
-<script src="plugins/sigma.layouts.forceAtlas2.min.js"></script>
-<script src="plugins/sigma.layouts.fruchtermanReingold.min.js"></script>
-<script src="plugins/sigma.layout.noverlap.min.js"></script>
-<script src="plugins/sigma.plugins.animate.min.js"></script>
-<script src="plugins/sigma.renderers.customEdgeShapes.min.js"></script>
-<script src="plugins/sigma.renderers.customShapes.min.js"></script>
+<!-- <br/> Légende : <font size="2">Pour le graphe Fusion / Les couleurs correspondent au texte affiché. Le texte correspond au mode sans couleur </font><p class="past">Arête en tirets et Noeuds carrés: - N'existe plus</p><p class="now">Arête en pointillés et Noeuds en diamant: Est arrivé cette année</p><p class="no">Reste: Inchangé </p> <font size="2"> Pour voir les pointes des arêtes spéciales (non-existantes ou récentes), ouvrez le graphe correspondant.</font> -->
 <!-- SIGMA APP IMPORT -->
 <script src="js/index.js"></script>
 <!-- APP INITIALISATION -->

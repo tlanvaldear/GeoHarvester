@@ -13,6 +13,9 @@ var login = 'neo4j';
 var connect = 'http://0.0.0.0:7474';
 var x = document.getElementById("myCheck");
 var hide = x.checked;
+
+
+
 sigma.neo4j.getLabels(
     { url: connect, user:login, password:pwd },
     function(labels) {
@@ -40,9 +43,6 @@ function progressive(){
     var div;
     cont.forEach(function(si){
         if (si.l == "NodeOall"){
-            div = document.getElementById(si.renderers[0].container.id);
-            div.style.height = "80%";
-            div.style.width = "80%";
             sinstance = si;
             si.graph.nodes().forEach(function(n){
                 if (n.neo4j_data['year'] == "2015"){
@@ -94,11 +94,6 @@ function progressive(){
                 sinstance.refresh();
             }, 5000);
         });
-    setTimeout(function(){
-      div.style.height = "50%";
-      div.style.width = "50%";
-      sinstance.refresh();
-    }, 7000);
 };
 
 function search_s(){
@@ -175,7 +170,6 @@ function query(label){
       });
       // Start the Fruchterman-Reingold algorithm:
       sigma.layouts.fruchtermanReingold.start(s);
-
       graphstart(s);
     }
     catch(e){
@@ -187,13 +181,15 @@ function query(label){
     }
     });
     deflab[label] = "true";
+    document.getElementById('sigma-container-'+label.slice(-4)).style.display = 'block';
+    return;
   }
   document.getElementById('sigma-container-'+label.slice(-4)).style.display = 'block';
   cont.forEach(function(si){
     if (si.l == label){
       sigma.layouts.fruchtermanReingold.start(si);
     }
-  })
+  });
 }
 function graphstart(s) {
   console.log("Graphstart")
@@ -216,6 +212,7 @@ var focus;
               n.type = 'square';
               n.color = '#b5c2ec';
         }
+        n.noeuds = "Élément moisson 2015 non subsistant"
       }
       else if (n.neo4j_data['year'] == "2017"){
           if (cbmode == true){
@@ -225,6 +222,10 @@ var focus;
               n.type = 'diamond'
               n.color = '#ff6666'; // orange
         }
+        n.noeuds = "Élément nouveau moisson 2017"
+      }
+      else {
+        n.noeuds = "Élément commun"
       }
     n.originalColor = n.color;
     n.label = n.neo4j_data['name'];
@@ -239,6 +240,7 @@ var focus;
               e.type = 'dashed';
               e.color = '#b5c2ec';
         }
+        e.aretes = "Élément moisson 2015 non subsistant"
       }
       else if (e.neo4j_data['year'] == "2017"){
           if (cbmode == true){
@@ -248,9 +250,11 @@ var focus;
             e.type = 'dotted';
             e.color = '#ff6666';
         }
+        e.aretes = "Élément nouveau moisson 2017"
       }
       else {
         e.type = 'curvedArrow';
+        e.aretes = 'Élément commun'
       }
     e.originalColor = e.color;
   });
@@ -347,6 +351,49 @@ var focus;
   focus = null;
   s.refresh();
   });
+  if (s.l == "NodeOall"){
+    var palet = {
+      sch: {
+        yearn: {
+          'Élément commun' : 'equilateral',
+          'Élément moisson 2015 non subsistant': 'square',
+          'Élément nouveau moisson 2017': 'diamond'
+        },
+        yeare: {
+          'Élément commun': 'curvedArrow',
+          'Élément moisson 2015 non subsistant': 'dashed',
+          'Élément nouveau moisson 2017': 'dotted'
+        }
+      }
+    };
+    var styl = {
+      nodes: {
+        type:{
+          by: 'noeuds',
+          scheme: 'sch.yearn'
+        }
+      },
+      edges: {
+        type: {
+          by: 'aretes',
+          scheme: 'sch.yeare'
+        }
+      }
+    };
+
+    var design = sigma.plugins.design(s, {
+      palette: palet,
+      styles: styl
+    });
+    design.apply()
+    var legendPlugin;
+    s.settings('legendWidth',350)
+    legendPlugin = sigma.plugins.legend(s);
+    legendPlugin.setExternalCSS(['http://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css']);
+    legendPlugin.setPlacement('right');
+    console.log(legendPlugin)
+    legendPlugin.draw();
+  }
 }
 // Add a method to the graph model that returns an
 // object with out neighbors of a node inside:
@@ -370,3 +417,7 @@ sigma.classes.graph.addMethod('neighbors', function(nodeId) {
             }
         return neighbors;
 });
+
+
+
+//
