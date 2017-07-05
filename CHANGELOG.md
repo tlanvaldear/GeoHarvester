@@ -119,4 +119,6 @@
 >
 > Denied **07/04**'s ShareCamera system - see ideas.md
 >
+> Changed Legend system to a more eye-friendly one.
+>
 > Starting another visual App.
