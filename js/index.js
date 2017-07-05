@@ -197,6 +197,7 @@ function graphstart(s) {
 s.settings('defaultEdgeType', 'curvedArrow');
 s.settings('minArrowSize', 10);
 s.settings('drawLabels',showlabels?true:false);
+s.settings('labelAlignment',"bottom")
 //Camera for recentering on node after click
 s.addCamera('cam0');
 var listener = s.configNoverlap({nodeMargin: 1.5, scaleNodes: 1.05, gridSize: 75, duration: 1});
@@ -387,7 +388,7 @@ var focus;
     });
     design.apply()
     var legendPlugin;
-    s.settings('legendWidth',350)
+    s.settings('legendWidth',300)
     legendPlugin = sigma.plugins.legend(s);
     legendPlugin.setExternalCSS(['http://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css']);
     legendPlugin.setPlacement('right');
