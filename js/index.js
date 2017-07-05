@@ -11,6 +11,8 @@ var queries = {};
 var pwd = 'tv38çqPL';
 var login = 'neo4j';
 var connect = 'http://0.0.0.0:7474';
+var x = document.getElementById("myCheck");
+var hide = x.checked;
 sigma.neo4j.getLabels(
     { url: connect, user:login, password:pwd },
     function(labels) {
@@ -277,10 +279,13 @@ var focus;
 
     s.graph.nodes().forEach(function(n) {
       ids[nodeId] = n;
-      if (toKeep[n.id])
+      if (toKeep[n.id]){
         n.color = n.originalColor;
+        n.hidden = false;
+      }
       else{
         n.color = '#eee';
+        n.hidden = hide;
         }
       if (n.id == nodeId){
         focus = n;
@@ -301,10 +306,14 @@ var focus;
       }
     });
     s.graph.edges().forEach(function(e) {
-          if (toKeep[e.source] && toKeep[e.target])
+          if (toKeep[e.source] && toKeep[e.target]){
             e.color = e.originalColor;
-          else
+            e.hidden = false;
+          }
+          else{
             e.color = '#eee';
+            e.hidden = hide;
+          }
     });
 
     // Since the data has been modified, we need to
@@ -322,6 +331,7 @@ var focus;
     cont.forEach(function(si){
         si.graph.nodes().forEach(function(n) {
           n.color = n.originalColor;
+          n.hidden = false;
           if (focus != null){
                   si.cameras[0].goTo({x:0,y:0,ratio:1});
               }
@@ -329,6 +339,7 @@ var focus;
           });
           si.graph.edges().forEach(function(e) {
             e.color = e.originalColor;
+            e.hidden = false;
           });
           si.refresh();
       });
