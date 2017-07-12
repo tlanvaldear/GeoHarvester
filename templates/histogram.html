@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+<title>Visuel comparatif</title>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<style>
+.bar:hover {
+  fill: red
+}
+</style>
+</head>
+<body>
+	<button class="btn btn-secondary" type="button" onclick="location.href='/'">Autres visualisations</button>
+	<script>
+		var body=d3.select("body");
+		var svg = body.append("svg");
+		svg.attr("width",510);
+		svg.attr("height",530);
+		var json = {{ data|tojson }};
+		var keys = Object.keys(json);
+		var hscale = d3.scale.linear().domain([0,d3.max(Object.values(json)[0])]).range([500,20]);
+		var xscale = d3.scale.ordinal().domain(keys).rangeRoundBands([70,500],0.05);
+		var bars = svg.selectAll("rect").data(Object.values(json)).enter().append("rect").attr("width",xscale.rangeBand()).attr("height",function (v,i) {return hscale(v);}).attr("x",function (v,i) {return xscale(keys[i]);}).attr("y",function (v,i) { return 500-hscale(v);});
+		var xaxis = d3.svg.axis().ticks(5).scale(xscale).orient("bottom");
+		var yaxis = d3.svg.axis().scale(hscale).ticks(5).orient("left");
+		svg.append("g").call(xaxis).attr("transform","translate(0,499.95)");
+		svg.append("g").call(yaxis).attr("transform","translate(75,0)");
+
+
+
+	</script>
+</body>
+</html>

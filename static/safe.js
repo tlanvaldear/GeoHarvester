@@ -8,22 +8,13 @@ var deflab = {};
 var cbmode = false;
 var showlabels = document.getElementById("labelsh").checked; // will check if useful
 var queries = {};
-var pwd = '87cEbq9d';
-var login = 'neo4j';
-var connect = 'http://0.0.0.0:7474';
+
 var x = document.getElementById("myCheck");
 var hide = x.checked;
 
 
 
-sigma.neo4j.getLabels(
-    { url: connect, user:login, password:pwd },
-    function(labels) {
-        labels.forEach(function(label){
-            queries[label] = "MATCH (n:"+label+") OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m"
-        });
-    }
-);
+
 
 function showhide(){
   console.log('showlabels: '+showlabels);
@@ -45,18 +36,18 @@ function progressive(){
         if (si.l == "NodeOall"){
             sinstance = si;
             si.graph.nodes().forEach(function(n){
-                if (n.neo4j_data['year'] == "2015"){
+                if (n.type == "square"){
                     n.hidden = false;
                     hide.push(n)
                 }
-                else if (n.neo4j_data['year'] == "2017"){
+                else if (n.type == "diamond"){
                     n.hidden = true;
                     hide2.push(n);
                 }
                 si.refresh();
             });
             si.graph.edges().forEach(function(e){
-                if (e.neo4j_data['year'] == "2015"){
+                if (e.type == "dashed"){
                     e.hidden = false;
                     si.refresh();
                     setTimeout(function(){
@@ -64,7 +55,7 @@ function progressive(){
                         si.refresh();
                     }, 5000)
                 }
-                else if (e.neo4j_data['year'] == "2017"){
+                else if (e.type == "dotted"){
                     e.hidden = true;
                     si.refresh();
                     setTimeout(function(){
@@ -85,7 +76,7 @@ function progressive(){
             return;
         }
         setTimeout( function(){
-                if (n.neo4j_data['year'] == "2015"){
+                if (n.type == "square"){
                     n.hidden = true;
                 }
                 else{
@@ -104,7 +95,7 @@ function search_s(){
   cont.forEach(function(si){
     if (si.l == "NodeOall"){
       si.graph.nodes().forEach(function(n){
-        if (n.neo4j_data['name'].toUpperCase() == ncs){
+        if (n.label.toUpperCase() == ncs){
           focus = n;
         }
       });
@@ -139,6 +130,7 @@ function cbmode_e(){
     query('NodeOall');
 }
 function query(label){
+    var fileName = '/json/'+label+'.json'
   console.log("query")
   if (deflab[label] == "true" && document.getElementById('sigma-container-'+label.slice(-4)).style.display == 'block'){
     document.getElementById('sigma-container-'+label.slice(-4)).style.display = 'none';
@@ -147,18 +139,23 @@ function query(label){
   if (!deflab[label]){
       var s = new sigma({
         renderer: {
-          container: document.getElementById('sigma-container-'+label.slice(-4)),
+          container: 'sigma-container-'+label.slice(-4),
           type: 'canvas'
         }});
-  sigma.neo4j.cypher(
-  { url: connect, user: login, password: pwd },
-  queries[label],
+  sigma.parsers.json(
+  fileName,
   s,
     function(s){
       try{
+      console.log("New graph")
       cont[cont.length] = s;
       cont[cont.length-1].l = label;
       cont[cont.length-1].explored = false;
+      s.graph.nodes().forEach(function(n){
+          n.x = Math.cos(Math.PI * 2 * Number(n.id) / 111);
+          n.y = Math.sin(Math.PI * 2 * Number(n.id) / 111);
+          s.refresh();
+      });
       var frListener = sigma.layouts.fruchtermanReingold.configure(s, {
         iterations: 500,
         easing: 'quadraticInOut',
@@ -205,22 +202,20 @@ var focus;
   // We first need to save the original colors of our
   // nodes and edges, like this:
   s.graph.nodes().forEach(function(n) {
-      if (n.neo4j_data['year'] == "2015"){
+      if (n.type == "square"){
           if (cbmode == true){
-              n.type = 'square';
+              n.color = '#000'
           }
           else{
-              n.type = 'square';
               n.color = '#b5c2ec';
         }
         n.noeuds = "Élément moisson 2015 non subsistant"
       }
-      else if (n.neo4j_data['year'] == "2017"){
+      else if (n.type == "diamond"){
           if (cbmode == true){
-              n.type = 'diamond';
+              n.color = '#000';
           }
           else{
-              n.type = 'diamond'
               n.color = '#ff6666'; // orange
         }
         n.noeuds = "Élément nouveau moisson 2017"
@@ -229,26 +224,23 @@ var focus;
         n.noeuds = "Élément commun"
       }
     n.originalColor = n.color;
-    n.label = n.neo4j_data['name'];
     s.refresh();
   });
   s.graph.edges().forEach(function(e) {
-      if (e.neo4j_data['year'] == "2015"){
+      if (e.type == "dashed"){
           if (cbmode == true){
-              e.type = 'dashed';
+              e.color = '#000';
           }
           else{
-              e.type = 'dashed';
               e.color = '#b5c2ec';
         }
         e.aretes = "Élément moisson 2015 non subsistant"
       }
-      else if (e.neo4j_data['year'] == "2017"){
+      else if (e.type == "dotted"){
           if (cbmode == true){
-              e.type = 'dotted';
+              e.color = '#000';
         }
         else{
-            e.type = 'dotted';
             e.color = '#ff6666';
         }
         e.aretes = "Élément nouveau moisson 2017"
@@ -258,6 +250,7 @@ var focus;
         e.aretes = 'Élément commun'
       }
     e.originalColor = e.color;
+    s.refresh;
   });
 //   s.startForceAtlas2({
 //         linLogMode: true,
@@ -397,16 +390,6 @@ var focus;
 }
 // Add a method to the graph model that returns an
 // object with out neighbors of a node inside:
-sigma.classes.graph.addMethod('neighbors1', function(nodeId) {
-var k,
-    neighbors = {},
-    index = this.outNeighborsIndex[nodeId];
-
-for (k in index)
-  neighbors[k] = this.nodesIndex[k];
-
-return neighbors;
-});
 
 sigma.classes.graph.addMethod('neighbors', function(nodeId) {
         var i,

@@ -8,16 +8,14 @@ var deflab = {};
 var cbmode = false;
 var showlabels = document.getElementById("labelsh").checked; // will check if useful
 var queries = {};
-var pwd = '87cEbq9d';
-var login = 'neo4j';
-var connect = 'http://0.0.0.0:7474';
+
 var x = document.getElementById("myCheck");
 var hide = x.checked;
 
 
 
 sigma.neo4j.getLabels(
-    { url: connect, user:login, password:pwd },
+    { url: login['url'], user:login['usr'], password:login['pw'] },
     function(labels) {
         labels.forEach(function(label){
             queries[label] = "MATCH (n:"+label+") OPTIONAL MATCH (n)-[r]->(m) RETURN n,r,m"
@@ -151,7 +149,7 @@ function query(label){
           type: 'canvas'
         }});
   sigma.neo4j.cypher(
-  { url: connect, user: login, password: pwd },
+  { url: login['url'], user:login['usr'], password:login['pw'] },
   queries[label],
   s,
     function(s){
