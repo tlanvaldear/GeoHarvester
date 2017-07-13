@@ -195,6 +195,7 @@ s.settings('defaultEdgeType', 'curvedArrow');
 s.settings('minArrowSize', 10);
 s.settings('drawLabels',showlabels?true:false);
 s.settings('labelAlignment',"top")
+s.settings('defaultLabelColor',"#00f")
 //Camera for recentering on node after click
 s.addCamera('cam0');
 var listener = s.configNoverlap({nodeMargin: 1.5, scaleNodes: 1.05, gridSize: 75, duration: 1});

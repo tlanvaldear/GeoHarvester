@@ -17,13 +17,22 @@
 	<button class="btn btn-secondary" type="button" onclick="location.href='/'">Autres visualisations</button>
     <button class="btn btn-secondary" type="button" onclick="location.href='/hist'">Retour</button>
     <div>
-        <svg width="14560" height="600"></svg>
+        <div style="position:fixed; left:30px">
+            <svg id="b" width="224" height="130"></svg>
+        </div>
+        <svg id="a" width="14560" height="600"></svg>
     </div>
 	<script>
-var svg = d3.select("svg"),
+var svg = d3.select("#a"),
 margin = {top: 20, right: 20, bottom: 30, left: 40},
 width = +svg.attr("width") - margin.left - margin.right,
-height = +svg.attr("height") - margin.top - margin.bottom,
+height = +svg.attr("height") - margin.top - margin.bottom
+g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+var svg2 = d3.select("#b"),
+margin = {top: 20, right: 20, bottom: 30, left: 40},
+width = +svg.attr("width") - margin.left - margin.right,
+height = +svg.attr("height") - margin.top - margin.bottom
 g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
 var x0 = d3.scaleBand()
@@ -82,25 +91,28 @@ d3.csv("csv/hist.csv", function(d, i, columns) {
       .attr("text-anchor", "start")
       .text("Degré de moisson");
 
-  var legend = g.append("g")
+  var legend = svg2.append("g")
       .attr("font-family", "sans-serif")
       .attr("font-size", 10)
       .attr("text-anchor", "end")
+      .attr("position","fixed")
     .selectAll("g")
     .data(keys.slice().reverse())
     .enter().append("g")
       .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
 
   legend.append("rect")
-      .attr("x", width - 19)
+      .attr("x", 224 -19)
       .attr("width", 19)
       .attr("height", 19)
-      .attr("fill", z);
+      .attr("fill", z)
+      .attr("position","fixed");
 
   legend.append("text")
-      .attr("x", width - 24)
+      .attr("x", 224 - 19)
       .attr("y", 9.5)
       .attr("dy", "0.32em")
+      .attr("position","fixed")
       .text(function(d) { return d; });
 });
 
