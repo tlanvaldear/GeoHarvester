@@ -127,24 +127,55 @@ def h():
 @app.route("/hist", methods=['GET', 'POST'])
 def hi():
     #For now, InOut. Create form in order to get In/Out/InOut
-    dmq = {}
-    dmds = {}
-    both = {}
-    for count in session.run("MATCH (k:NodeOall) return k.name,k.year"):
-        if count[1] != 'x':
-            for acount in session.run("MATCH (k:Node"+count[1]+" {name:'"+count[0].replace("'","")+"'}) with k, size((k)-[]-()) as degree return degree"):
-                both[count[0]] = [acount[0] if count[1] == "2015" else 0,0 if count[1] == "2015" else acount[0]]
-        else:
-            for acount in session.run("MATCH (k:Node2015 {name: '"+count[0]+"'}) with k, size((k)-[]-()) as degree return degree"):
-                dmq[count[0]] = acount[0]
-            for bcount in session.run("MATCH (k:Node2017 {name: '"+count[0]+"'}) with k, size((k)-[]-()) as degree return degree"):
-                dmds[count[0]] = bcount[0]
-            both[count[0]] = [dmq[count[0]],dmds[count[0]]]
-    for key,value in both.items():
-        #create csvfile with values as is : name,degreeyear1,degreeyear2
-        continue
-    return render_template("histogram.html",data = both)
+    if request.method == 'POST':
+        dmq = {}
+        dmds = {}
+        both = {}
+        side = "(k)-[]-()"
+        if request.form['mode'] == "In":
+            side = "(k)<-[]-()"
+        elif request.form['mode'] == "Out":
+            side = "(k)-[]->()"
 
+        for count in session.run("MATCH (k:NodeOall) return k.name,k.year"):
+            if count[1] != 'x':
+                for acount in session.run("MATCH (k:Node"+count[1]+" {name:'"+count[0].replace("'","")+"'}) with k, size("+side+") as degree return degree"):
+                    both[count[0]] = [acount[0] if count[1] == "2015" else 0,0 if count[1] == "2015" else acount[0]]
+            else:
+                for acount in session.run("MATCH (k:Node2015 {name: '"+count[0]+"'}) with k, size("+side+") as degree return degree"):
+                    dmq[count[0]] = acount[0]
+                for bcount in session.run("MATCH (k:Node2017 {name: '"+count[0]+"'}) with k, size("+side+") as degree return degree"):
+                    dmds[count[0]] = bcount[0]
+                both[count[0]] = [dmq[count[0]],dmds[count[0]]]
+        f =open("static/hist.csv","w")
+        f.write(u"SIG,Moissons 2015,Moissons 2017\n")
+        for key,value in both.items():
+            f.write(u''+key.replace("(","").replace(")","")+','+repr(value[0])+','+repr(value[1])+'\n')
+        f.close()
+        return render_template("histogram.html")
+    form = ''
+    form += '<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">'
+    form += '<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>'
+    form += '<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>'
+
+    form+='<center>'
+    form+='<div class="jumbotron">'
+    form+= '<h1>Sélection du type de visuel</h1>'
+    form+= '<p>Histogrammes</p>'
+    form+='</div>'
+    form+='</center>'
+
+    form+= '<div style="margin:200px; margin-top:30px;">'
+    form += '<form action="" method="post" class="form-horizontal" data-fv-framework="bootstrap" data-fv-icon-valid="glyphicon glyphicon-ok"  data-fv-icon-invalid="glyphicon glyphicon-remove"  data-fv-icon-validating="glyphicon glyphicon-refresh">'
+    form += '<div class ="form-group>"'
+    form +='<p>Type de visuel souhaité : <select name="mode"> <option value="In">Degré entrant</option><option value="Out">Degré Sortant</option> <option value="InOut">Degré</option></select></p>'
+    form +='<input style="max-width:100px; display:inline;" class="form-control" type="submit" value="Envoyer" />'
+    form +='</div>'
+    form+='</form>'
+    form+='</div>'
+
+    form += '<script>$(document).ready(function() {    $("#signInForm").formValidation();});</script>'
+    return form
 
 
 
