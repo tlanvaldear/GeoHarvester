@@ -19,6 +19,14 @@ CSV Files to import into Neo4j
 
 - Edit your neo4j conf file `YOUR_NEO4J_PATH/conf/neo4j.conf` in order to open access to `0.0.0.0`
 
-- If not on a webserver, use `python -m SimpleHTTPServer` in the root directory of *GeoHarvester*
-
+- If not on a webserver or using the degraded js version, use `python -m SimpleHTTPServer` in the root directory of *GeoHarvester*
+>> Else skip to Using Flask
 - Connect to [0.0.0.0:8000](http://0.0.0.0:8000)
+
+## Using Flask
+ 
+  - Start webapp.py in a python virtualenv.
+  
+  - Connect to your localhost, port 5000.
+  
+
