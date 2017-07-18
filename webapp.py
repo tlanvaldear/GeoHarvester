@@ -109,24 +109,23 @@ def h():
     form+='<div class="jumbotron">'
     form+= '<h1>Visuels comparatifs</h1>'
     form+= '<p>Issus de données récupérées dans le cadre du projet GEOBS</p>'
+    form+= '<p><font size=2>Moissonnage des IDG de 2015 et 2017</font></p>'
     form+='</div>'
     form+='</center>'
 
     form+= '<div style="margin:200px; margin-top:30px;">'
     form += '<form action="" method="post" class="form-horizontal" data-fv-framework="bootstrap" data-fv-icon-valid="glyphicon glyphicon-ok"  data-fv-icon-invalid="glyphicon glyphicon-remove"  data-fv-icon-validating="glyphicon glyphicon-refresh">'
     form += '<div class ="form-group>"'
-    form +='<p>Type de visuel souhaité : <select name="typ"> <option value="cpch">Histogramme du degré de moisson</option><option value="graph">Graphe des moissons</option></select></p>'
+    form +='<p>Type de visuel souhaité : <select name="typ"> <option value="graph">Graphe des moissons</option><option value="cpch">Histogramme du degré de moisson</option></select></p>'
     form +='<input style="max-width:100px; display:inline;" class="form-control" type="submit" value="Envoyer" />'
     form +='</div>'
     form+='</form>'
     form+='</div>'
 
-    form += '<script>$(document).ready(function() {    $("#signInForm").formValidation();});</script>'
     return form
 
 @app.route("/hist", methods=['GET', 'POST'])
 def hi():
-    #For now, InOut. Create form in order to get In/Out/InOut
     if request.method == 'POST':
         dmq = {}
         dmds = {}
@@ -150,7 +149,10 @@ def hi():
         f =open("static/hist.csv","w")
         f.write(u"SIG,Moissons 2015,Moissons 2017\n")
         for key,value in both.items():
-            f.write(u''+key.replace("(","").replace(")","")+','+repr(value[0])+','+repr(value[1])+'\n')
+            if value == [0,0]:
+                continue
+            else:
+                f.write(u''+key.replace("(","").replace(")","")+','+repr(value[0])+','+repr(value[1])+'\n')
         f.close()
         return render_template("histogram.html")
     form = ''
@@ -174,7 +176,6 @@ def hi():
     form+='</form>'
     form+='</div>'
 
-    form += '<script>$(document).ready(function() {    $("#signInForm").formValidation();});</script>'
     return form
 
 

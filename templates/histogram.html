@@ -8,8 +8,8 @@
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script src="https://d3js.org/d3.v4.min.js"></script>
 <style>
-.axis .domain {
-  display: none;
+.xa {
+  position: fixed;
 }
 </style>
 </head>
@@ -18,7 +18,7 @@
     <button class="btn btn-secondary" type="button" onclick="location.href='/hist'">Retour</button>
     <div>
         <div style="position:fixed; left:30px">
-            <svg id="b" width="224" height="130"></svg>
+            <svg id="b"></svg>
         </div>
         <svg id="a" width="14560" height="600"></svg>
     </div>
@@ -72,7 +72,9 @@ d3.csv("csv/hist.csv", function(d, i, columns) {
       .attr("y", function(d) { return y(d.value); })
       .attr("width", x1.bandwidth())
       .attr("height", function(d) { return height - y(d.value); })
-      .attr("fill", function(d) { return z(d.key); });
+      .attr("fill", function(d) { return z(d.key); })
+      .append("svg:title")
+   	  .text(function(d) { return d.key +" - "+ d.value; });
 
   g.append("g")
       .attr("class", "axis")
@@ -80,7 +82,7 @@ d3.csv("csv/hist.csv", function(d, i, columns) {
       .call(d3.axisBottom(x0));
 
   g.append("g")
-      .attr("class", "axis")
+      .attr("class", "xa")
       .call(d3.axisLeft(y).ticks(null, "s"))
     .append("text")
       .attr("x", 2)
