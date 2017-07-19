@@ -25,7 +25,6 @@ def home():
         labels.append(n[0][0])
     for lab in labels:
         nl = {}
-        print(lab)
         f = open('static/'+lab+'.json','w')
         f.write("{")
         for n in session.run("MATCH (n:"+lab+")-[r]->(m) RETURN id(n),id(m),id(r),r.year"):
@@ -127,6 +126,8 @@ def h():
 @app.route("/hist", methods=['GET', 'POST'])
 def hi():
     if request.method == 'POST':
+        if request.form['mode'] == "cpc":
+            return redirect("/cpc",code=302)
         dmq = {}
         dmds = {}
         both = {}
@@ -170,7 +171,7 @@ def hi():
     form+= '<div style="margin:200px; margin-top:30px;">'
     form += '<form action="" method="post" class="form-horizontal" data-fv-framework="bootstrap" data-fv-icon-valid="glyphicon glyphicon-ok"  data-fv-icon-invalid="glyphicon glyphicon-remove"  data-fv-icon-validating="glyphicon glyphicon-refresh">'
     form += '<div class ="form-group>"'
-    form +='<p>Type de visuel souhaité : <select name="mode"> <option value="In">Degré entrant</option><option value="Out">Degré Sortant</option> <option value="InOut">Degré</option></select></p>'
+    form +='<p>Type de visuel souhaité : <select name="mode"> <option value="In">Degré entrant</option><option value="Out">Degré Sortant</option> <option value="InOut">Degré</option><option value="cpc">Cas par Cas</option></select></p>'
     form +='<input style="max-width:100px; display:inline;" class="form-control" type="submit" value="Envoyer" />'
     form +='</div>'
     form+='</form>'
@@ -178,6 +179,77 @@ def hi():
 
     return form
 
+@app.route("/cpc",methods=['GET', 'POST'])
+def cpc():
+	if request.method == 'POST':
+		nodes = []
+		sig= request.form['sig'].replace(" ","")
+		both = {}
+		dmq = {}
+		dmds = {}
+		side = ["(k)-[]-()","(k)<-[]-()","(k)-[]->()"]
+		here = False
+		for name in session.run("MATCH (n:NodeOall) return n.name"):
+			nodes.append(name[0])
+		for el in nodes:
+			if el.upper() == sig.upper():
+				here = True
+				for y in session.run("MATCH (k:NodeOall {name: '"+el+"'}) return k.year"):
+					if y[0] != 'x':
+						for acount in session.run("MATCH (k:Node"+y[0]+" {name:'"+el.replace("'","")+"'}) with k, size((k)-[]-()) as degree return degree"):
+							both["Degré"] = [acount[0] if y[0] == "2015" else 0,0 if y[0] == "2015" else acount[0]]
+						for acount in session.run("MATCH (k:Node"+y[0]+" {name:'"+el.replace("'","")+"'}) with k, size((k)<-[]-()) as degree return degree"):
+							both["Entrant"] = [acount[0] if y[0] == "2015" else 0,0 if y[0] == "2015" else acount[0]]
+						for acount in session.run("MATCH (k:Node"+y[0]+" {name:'"+el.replace("'","")+"'}) with k, size((k)-[]->()) as degree return degree"):
+							both["Sortant"] = [acount[0] if y[0] == "2015" else 0,0 if y[0] == "2015" else acount[0]]
+					else:
+						i=0
+						for sid in side:
+							for acount in session.run("MATCH (k:Node2015 {name: '"+el.replace("'","")+"'}) with k, size("+sid+") as degree return degree"):
+								dmq[el.replace("'","")] = acount[0]
+							for bcount in session.run("MATCH (k:Node2017 {name: '"+el.replace("'","")+"'}) with k, size("+sid+") as degree return degree"):
+								dmds[el.replace("'","")] = bcount[0]
+							if i == 0:
+								both["Degré"] = [dmq[el.replace("'","")],dmds[el.replace("'","")]]
+							elif i == 1:
+								both["Entrant"] = [dmq[el.replace("'","")],dmds[el.replace("'","")]]
+							elif i == 2:
+								both["Sortant"] = [dmq[el.replace("'","")],dmds[el.replace("'","")]]
+							i += 1
+					f =open("static/hist.csv","w")
+					f.write(u"SIG,Moissons 2015,Moissons 2017\n")
+				for key,value in both.items():
+					if value == [0,0]:
+						continue
+					else:
+						f.write(u''+key.replace("(","").replace(")","")+','+repr(value[0])+','+repr(value[1])+'\n')
+				f.close()
+		if here == False:
+			return redirect("/cpc",code=302)
+		return render_template("histcpc.html", data=sig)
+
+
+	form = ''
+	form += '<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">'
+	form += '<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>'
+	form += '<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>'
+	
+	form+='<center>'
+	form+='<div class="jumbotron">'
+	form+= '<h1>Formulaire de recherche</h1>'
+	form+= '<p>Observez les différences de moissonnage par année d\'un SIG spécifique</p>'
+	form+='</div>'
+	form+='</center>'
+	
+	form+= '<div style="margin:200px; margin-top:30px;">'
+	form += '<form action="" method="post" class="form-horizontal" data-fv-framework="bootstrap" data-fv-icon-valid="glyphicon glyphicon-ok"  data-fv-icon-invalid="glyphicon glyphicon-remove"  data-fv-icon-validating="glyphicon glyphicon-refresh">'
+	form += '<div class ="form-group>"'
+	form +='<p>SIG : <input style="max-width:300px; display:inline;" class="form-control" type="text" name="sig" required/></p>'
+	form +='<input style="max-width:100px; display:inline;" class="form-control" type="submit" value="Envoyer" />'
+	form +='</div>'
+	form+='</form>'
+	form+='</div>'
+	return form
 
 
 #NE SURTOUT PAS MODIFIER
