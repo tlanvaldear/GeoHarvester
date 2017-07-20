@@ -1,3 +1,6 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from flask import *
 from socket import *
 import sys
@@ -6,14 +9,14 @@ from neo4j.v1 import GraphDatabase, basic_auth
 #NE PAS MODIFIER LA LIGNE SUIVANTE
 app = Flask(__name__)
 
-driver = GraphDatabase.driver("bolt://cocatris.emi.u-bordeaux.fr", auth=basic_auth("neo4j", "dummy"))
+driver = GraphDatabase.driver("bolt://localhost", auth=basic_auth("neo4j", "tv38çqPL"))
 session = driver.session()
 
 # Application Proof of Concept - UNSECURE
 # it HAS to be replaced by the route "/" one when implemented
 @app.route("/poc/")
 def poc():
-    js = json.loads(json.dumps({"usr": 'neo4j', "pw": 'dummy', "url": 'http://cocatris.emi.u-bordeaux.fr:7474'}))
+    js = json.loads(json.dumps({"usr": 'neo4j', "pw": 'tv38çqPL', "url": 'http://localhost:7474'}))
     return render_template("index.html",data = js)
 
 @app.route("/graph")
@@ -222,7 +225,7 @@ def cpc():
 					if value == [0,0]:
 						continue
 					else:
-						f.write(u''+key.replace("(","").replace(")","")+','+repr(value[0])+','+repr(value[1])+'\n')
+						f.write(key.replace("(","").replace(")","")+','+repr(value[0])+','+repr(value[1])+'\n')
 				f.close()
 		if here == False:
 			return redirect("/cpc",code=302)
@@ -233,14 +236,14 @@ def cpc():
 	form += '<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">'
 	form += '<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>'
 	form += '<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>'
-	
+
 	form+='<center>'
 	form+='<div class="jumbotron">'
 	form+= '<h1>Formulaire de recherche</h1>'
 	form+= '<p>Observez les différences de moissonnage par année d\'un SIG spécifique</p>'
 	form+='</div>'
 	form+='</center>'
-	
+
 	form+= '<div style="margin:200px; margin-top:30px;">'
 	form += '<form action="" method="post" class="form-horizontal" data-fv-framework="bootstrap" data-fv-icon-valid="glyphicon glyphicon-ok"  data-fv-icon-invalid="glyphicon glyphicon-remove"  data-fv-icon-validating="glyphicon glyphicon-refresh">'
 	form += '<div class ="form-group>"'
