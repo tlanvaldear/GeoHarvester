@@ -62,15 +62,13 @@
         <input type="text" id="gisearch" onkeyup="search_s()" placeholder="Rechercher un SIG...">
         <input type="checkbox" id="myCheck" defaultChecked="false" onchange="hide = !hide; console.log('hide:'+hide)">Cacher les noeuds non moisonnés par la sélection</input>
         <input type="checkbox" id="labelsh" defaultChecked="false" onchange="showlabels = !showlabels; showhide()">Afficher les noms des IDG</input>
-        <button class="btn btn-secondary" type="button" onclick="location.href='/'">Autres visualisations</button>
+        <button class="btn btn-secondary" type="button" onclick="location.href='{{url_for("hist")}}'">Autre visualisation</button>
     </div>
     <!-- ADD A DIV TOO IN ORDER TO STOCK ITS CANVAS INTO THE VISUALIZATION TOOL UPON CLICK -->
 <div class="sigma" id="sigma-container-2015"><div class="bg">2015</div></div>
 <div class="sigma" id="sigma-container-2017"><div class="bg">2017</div></div>
 <div class="sigma" id="sigma-container-Oall"><div class="bg">Fusion</div></div>
-
-<!-- TODO: replace text with structured image system -->
-<!-- <br/> Légende : <font size="2">Pour le graphe Fusion / Les couleurs correspondent au texte affiché. Le texte correspond au mode sans couleur </font><p class="past">Arête en tirets et Noeuds carrés: - N'existe plus</p><p class="now">Arête en pointillés et Noeuds en diamant: Est arrivé cette année</p><p class="no">Reste: Inchangé </p> <font size="2"> Pour voir les pointes des arêtes spéciales (non-existantes ou récentes), ouvrez le graphe correspondant.</font> -->
+<script>var dmq = {{dmq | tojson}}; var dmds = {{dmds | tojson}}; var both = {{b | tojson}}; var graphs  = {"2015" : dmq, "2017" : dmds, "Oall" : both};</script>
 <!-- SIGMA APP IMPORT -->
 <script src="/js/safe.js"></script>
 <!-- APP INITIALISATION -->

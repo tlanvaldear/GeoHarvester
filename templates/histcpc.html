@@ -15,9 +15,10 @@
 </head>
 <body>
 
-	<button class="btn btn-secondary" type="button" onclick="location.href='/'">Autres visualisations</button>
-    <button class="btn btn-secondary" type="button" onclick="location.href='/cpc'">Retour</button>
-    {{data}}</br>
+	<button class="btn btn-secondary" type="button" onclick="location.href='{{url_for("home")}}'">Autre visualisation</button>
+    <button class="btn btn-secondary" type="button" onclick="location.href='{{url_for("hist")}}'">Retour</button>
+    <button class="btn btn-secondary" type="button" onclick="location.href='{{url_for("cpc")}}'">Autre IDG </button>
+    {{idg}}</br>
     <div>
         <div style="position:fixed; left:30px">
             <svg id="b"></svg>
@@ -50,11 +51,18 @@ var y = d3.scaleLinear()
 var z = d3.scaleOrdinal()
     .range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"]);
 
-d3.csv("csv/hist.csv", function(d, i, columns) {
-  for (var i = 1, n = columns.length; i < n; ++i) d[columns[i]] = +d[columns[i]];
-  return d;
-}, function(error, data) {
-  if (error) throw error;
+    var csv = d3.csvFormat({{data|tojson}}).split("\n").slice(1).join("\n")
+
+    data = d3.csvParse(csv, function(d, i, columns) {
+      for (var i = 1, n = columns.length; i < n; ++i) d[columns[i]] = +d[columns[i]];
+      return {
+        SIG:d.SIG,
+        'Moissons 2015':d['Moissons 2015'],
+        'Moissons 2017':d['Moissons 2017'],
+        columns:columns
+      };
+    })
+
 
   var keys = data.columns.slice(1);
 
@@ -118,7 +126,6 @@ d3.csv("csv/hist.csv", function(d, i, columns) {
       .attr("dy", "0.32em")
       .attr("position","fixed")
       .text(function(d) { return d; });
-});
 
 
 

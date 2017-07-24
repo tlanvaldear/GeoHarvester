@@ -14,8 +14,6 @@ var hide = x.checked;
 
 
 
-
-
 function showhide(){
   console.log('showlabels: '+showlabels);
   cont.forEach(function(si){
@@ -130,7 +128,6 @@ function cbmode_e(){
     query('NodeOall');
 }
 function query(label){
-    var fileName = '/json/'+label+'.json'
   console.log("query")
   if (deflab[label] == "true" && document.getElementById('sigma-container-'+label.slice(-4)).style.display == 'block'){
     document.getElementById('sigma-container-'+label.slice(-4)).style.display = 'none';
@@ -138,16 +135,11 @@ function query(label){
   }
   if (!deflab[label]){
       var s = new sigma({
+        graph: graphs[label.slice(-4)], //kinda slow but works
         renderer: {
           container: 'sigma-container-'+label.slice(-4),
           type: 'canvas'
         }});
-  sigma.parsers.json(
-  fileName,
-  s,
-    function(s){
-      try{
-      console.log("New graph")
       cont[cont.length] = s;
       cont[cont.length-1].l = label;
       cont[cont.length-1].explored = false;
@@ -159,7 +151,7 @@ function query(label){
       var frListener = sigma.layouts.fruchtermanReingold.configure(s, {
         iterations: 500,
         easing: 'quadraticInOut',
-        duration: 800
+        duration: 400
       });
       // Bind the events:
       frListener.bind('start stop interpolate', function(e) {
@@ -168,15 +160,6 @@ function query(label){
       // Start the Fruchterman-Reingold algorithm:
       sigma.layouts.fruchtermanReingold.start(s);
       graphstart(s);
-    }
-    catch(e){
-      if (e instanceof TypeError){
-        alert("JavaScript encountered a TypeError. Resetting everything and requerying...")
-        deflab = {}
-        query(label)
-      }
-    }
-    });
     deflab[label] = "true";
     document.getElementById('sigma-container-'+label.slice(-4)).style.display = 'block';
     return;
@@ -195,7 +178,7 @@ s.settings('defaultEdgeType', 'curvedArrow');
 s.settings('minArrowSize', 10);
 s.settings('drawLabels',showlabels?true:false);
 s.settings('labelAlignment',"top")
-s.settings('defaultLabelColor',"#00f")
+s.settings('defaultLabelColor',"#000")
 //Camera for recentering on node after click
 s.addCamera('cam0');
 var listener = s.configNoverlap({nodeMargin: 1.5, scaleNodes: 1.05, gridSize: 75, duration: 1});
